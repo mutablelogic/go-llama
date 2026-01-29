@@ -294,7 +294,10 @@ func TestModelInfoOnClosed(t *testing.T) {
 		t.Error("expected error on closed model")
 	}
 
-	desc := model.Description()
+	desc, err := model.Description()
+	if err == nil {
+		t.Error("expected error on closed model for Description")
+	}
 	if desc != "" {
 		t.Error("expected empty description on closed model")
 	}

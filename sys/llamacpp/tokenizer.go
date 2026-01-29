@@ -142,10 +142,11 @@ func (m *Model) Tokenize(text string, opts TokenizeOptions) ([]Token, error) {
 	return tokens[:n], nil
 }
 
-// TokenToString converts a single token to its string representation
-func (m *Model) TokenToString(token Token) string {
+// TokenToString converts a single token to its string representation.
+// Returns ErrInvalidModel if model is closed, ErrInvalidToken if token is invalid.
+func (m *Model) TokenToString(token Token) (string, error) {
 	if m.handle == nil {
-		return ""
+		return "", ErrInvalidModel
 	}
 
 	// Most tokens are short, start with small buffer
@@ -169,11 +170,11 @@ func (m *Model) TokenToString(token Token) string {
 			C.bool(true),
 		)
 		if n < 0 {
-			return ""
+			return "", ErrInvalidToken
 		}
 	}
 
-	return string(buf[:n])
+	return string(buf[:n]), nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////

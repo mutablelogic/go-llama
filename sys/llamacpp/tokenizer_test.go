@@ -134,7 +134,11 @@ func TestTokenToString(t *testing.T) {
 	}
 
 	for i, token := range tokens {
-		piece := model.TokenToString(token)
+		piece, err := model.TokenToString(token)
+		if err != nil {
+			t.Errorf("TokenToString(%d) failed: %v", token, err)
+			continue
+		}
 		t.Logf("Token %d: %d -> %q", i, token, piece)
 	}
 }

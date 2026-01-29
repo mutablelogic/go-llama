@@ -1,6 +1,7 @@
 package llamacpp_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/mutablelogic/go-llama/sys/llamacpp"
@@ -38,25 +39,29 @@ func TestMetaKeyValue(t *testing.T) {
 	defer model.Close()
 
 	// Get first key
-	key := model.MetaKey(0)
-	if key == "" {
-		t.Fatal("expected non-empty key at index 0")
+	key, err := model.MetaKey(0)
+	if err != nil {
+		t.Fatalf("expected non-empty key at index 0: %v", err)
 	}
 	t.Logf("Key 0: %s", key)
 
 	// Get value for that key
-	value := model.MetaValue(key)
-	t.Logf("Value: %s", value)
-
-	// Invalid index should return empty string
-	empty := model.MetaKey(-1)
-	if empty != "" {
-		t.Error("expected empty string for invalid index")
+	value, err := model.MetaValue(key)
+	if err != nil {
+		t.Logf("Value not found for key %s: %v", key, err)
+	} else {
+		t.Logf("Value: %s", value)
 	}
 
-	empty = model.MetaKey(9999)
-	if empty != "" {
-		t.Error("expected empty string for out-of-range index")
+	// Invalid index should return error
+	_, err = model.MetaKey(-1)
+	if err == nil {
+		t.Error("expected error for invalid index")
+	}
+
+	_, err = model.MetaKey(9999)
+	if err == nil {
+		t.Error("expected error for out-of-range index")
 	}
 }
 
@@ -71,7 +76,10 @@ func TestMetadata(t *testing.T) {
 	}
 	defer model.Close()
 
-	meta := model.AllMetadata()
+	meta, err := model.AllMetadata()
+	if err != nil {
+		t.Fatalf("failed to get metadata: %v", err)
+	}
 	if len(meta) == 0 {
 		t.Fatal("expected non-empty metadata map")
 	}
@@ -97,7 +105,10 @@ func TestModelName(t *testing.T) {
 	}
 	defer model.Close()
 
-	name := model.Name()
+	name, err := model.Name()
+	if err != nil && !errors.Is(err, llamacpp.ErrKeyNotFound) {
+		t.Fatalf("unexpected error getting name: %v", err)
+	}
 	t.Logf("Model name: %q", name)
 }
 
@@ -112,7 +123,10 @@ func TestModelArch(t *testing.T) {
 	}
 	defer model.Close()
 
-	arch := model.Arch()
+	arch, err := model.Arch()
+	if err != nil {
+		t.Fatalf("failed to get architecture: %v", err)
+	}
 	if arch == "" {
 		t.Error("expected non-empty architecture")
 	}
@@ -161,7 +175,10 @@ func TestModelDescription(t *testing.T) {
 	}
 	defer model.Close()
 
-	desc := model.Description()
+	desc, err := model.Description()
+	if err != nil && !errors.Is(err, llamacpp.ErrKeyNotFound) {
+		t.Fatalf("unexpected error getting description: %v", err)
+	}
 	t.Logf("Model description: %q", desc)
 	// Description may be empty for some models, so we just log it
 }

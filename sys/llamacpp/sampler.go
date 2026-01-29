@@ -2,6 +2,7 @@ package llamacpp
 
 /*
 #include "sampler.h"
+#include <stdlib.h>
 */
 import "C"
 import (
@@ -291,4 +292,96 @@ func (sc *SamplerChain) Length() int32 {
 		return 0
 	}
 	return int32(C.llama_go_sampler_chain_n(sc.handle))
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ADVANCED SAMPLERS
+
+// XTCSampler excludes top choices for diversity
+type XTCSampler struct {
+	Sampler
+}
+
+// XTCParams configures XTC (Exclude Top Choices) sampling
+type XTCParams struct {
+	Probability float32 // Probability threshold (0.0-1.0)
+	Threshold   float32 // Logit threshold
+	MinKeep     int     // Minimum tokens to keep
+	Seed        uint32  // Random seed
+}
+
+// DefaultXTCParams returns sensible XTC defaults
+func DefaultXTCParams() XTCParams {
+	return XTCParams{
+		Probability: 0.0,
+		Threshold:   0.1,
+		MinKeep:     1,
+		Seed:        0,
+	}
+}
+
+// NewXTCSampler creates an XTC sampler for diversity
+func NewXTCSampler(params XTCParams) (*XTCSampler, error) {
+	handle := C.llama_go_sampler_init_xtc(
+		C.float(params.Probability),
+		C.float(params.Threshold),
+		C.size_t(params.MinKeep),
+		C.uint32_t(params.Seed),
+	)
+	if handle == nil {
+		return nil, getLastError()
+	}
+
+	s := &XTCSampler{
+		Sampler: Sampler{handle: handle},
+	}
+
+	runtime.SetFinalizer(s, func(s *XTCSampler) {
+		s.Close()
+	})
+
+	return s, nil
+}
+
+// MirostatV2Sampler uses simplified Mirostat algorithm
+type MirostatV2Sampler struct {
+	Sampler
+}
+
+// MirostatV2Params configures Mirostat v2 sampling
+type MirostatV2Params struct {
+	Seed uint32  // Random seed
+	Tau  float32 // Target cross-entropy (higher = more random)
+	Eta  float32 // Learning rate for mu updates
+}
+
+// DefaultMirostatV2Params returns sensible Mirostat v2 defaults
+func DefaultMirostatV2Params() MirostatV2Params {
+	return MirostatV2Params{
+		Seed: 0,
+		Tau:  5.0,
+		Eta:  0.1,
+	}
+}
+
+// NewMirostatV2Sampler creates a Mirostat v2 sampler
+func NewMirostatV2Sampler(params MirostatV2Params) (*MirostatV2Sampler, error) {
+	handle := C.llama_go_sampler_init_mirostat_v2(
+		C.uint32_t(params.Seed),
+		C.float(params.Tau),
+		C.float(params.Eta),
+	)
+	if handle == nil {
+		return nil, getLastError()
+	}
+
+	s := &MirostatV2Sampler{
+		Sampler: Sampler{handle: handle},
+	}
+
+	runtime.SetFinalizer(s, func(s *MirostatV2Sampler) {
+		s.Close()
+	})
+
+	return s, nil
 }

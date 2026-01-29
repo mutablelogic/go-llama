@@ -2,6 +2,7 @@ package llamacpp
 
 /*
 #include "context.h"
+#include <stdlib.h>
 */
 import "C"
 import (
@@ -192,6 +193,14 @@ func (c *Context) SeqMax() uint32 {
 	return uint32(C.llama_go_context_n_seq_max(c.handle))
 }
 
+// CtxSeq returns the context size per sequence
+func (c *Context) CtxSeq() uint32 {
+	if c.handle == nil {
+		return 0
+	}
+	return uint32(C.llama_go_context_n_ctx_seq(c.handle))
+}
+
 // Model returns the model associated with this context
 func (c *Context) Model() *Model {
 	return c.model
@@ -208,18 +217,122 @@ func (c *Context) KVCacheTypeV() GGMLType {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// MEMORY / KV CACHE OPERATIONS (additional prefix caching support)
-
-// MemorySeqKeep removes all tokens that do not belong to the specified sequence.
-func (c *Context) MemorySeqKeep(seqID int32) {
-	if c.handle == nil {
-		return
-	}
-	C.llama_go_memory_seq_keep(c.handle, C.int32_t(seqID))
-}
+// Note: All memory/KV cache operations (MemoryClear, MemorySeq*) are in decode.go
+// Note: Performance monitoring (Perf, PerfReset) is in runtime.go
 
 ///////////////////////////////////////////////////////////////////////////////
-// STATE SAVE/LOAD (for persistent prefix caching)
+// STATE SAVE/LOAD
+
+// StateGetSize returns the size in bytes needed to save full context state.
+func (c *Context) StateGetSize() uint64 {
+	if c.handle == nil {
+		return 0
+	}
+	return uint64(C.llama_go_state_get_size(c.handle))
+}
+
+// StateGetData copies full context state into a byte slice.
+// Returns the number of bytes written.
+func (c *Context) StateGetData() ([]byte, error) {
+	if c.handle == nil {
+		return nil, ErrInvalidContext
+	}
+
+	size := c.StateGetSize()
+	if size == 0 {
+		return nil, nil
+	}
+
+	data := make([]byte, size)
+	written := C.llama_go_state_get_data(
+		c.handle,
+		(*C.uint8_t)(unsafe.Pointer(&data[0])),
+		C.size_t(size),
+	)
+	if written == 0 {
+		return nil, getLastError()
+	}
+
+	return data[:written], nil
+}
+
+// StateSetData restores full context state from a byte slice.
+// Returns the number of bytes read, or an error if restoration failed.
+func (c *Context) StateSetData(data []byte) (uint64, error) {
+	if c.handle == nil {
+		return 0, ErrInvalidContext
+	}
+	if len(data) == 0 {
+		return 0, nil
+	}
+
+	read := C.llama_go_state_set_data(
+		c.handle,
+		(*C.uint8_t)(unsafe.Pointer(&data[0])),
+		C.size_t(len(data)),
+	)
+	if read == 0 {
+		return 0, getLastError()
+	}
+
+	return uint64(read), nil
+}
+
+// StateSaveFile saves full context state to a file.
+// tokens: optional slice of tokens to save alongside the state.
+// Returns true on success.
+func (c *Context) StateSaveFile(path string, tokens []Token) error {
+	if c.handle == nil {
+		return ErrInvalidContext
+	}
+
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+
+	var tokPtr *C.int32_t
+	var nTokens C.size_t
+	if len(tokens) > 0 {
+		tokPtr = (*C.int32_t)(unsafe.Pointer(&tokens[0]))
+		nTokens = C.size_t(len(tokens))
+	}
+
+	success := C.llama_go_state_save_file(c.handle, cPath, tokPtr, nTokens)
+	if !success {
+		return getLastError()
+	}
+	return nil
+}
+
+// StateLoadFile loads full context state from a file.
+// If maxTokens > 0, also loads tokens into the returned slice.
+// Returns tokens and error.
+func (c *Context) StateLoadFile(path string, maxTokens int) ([]Token, error) {
+	if c.handle == nil {
+		return nil, ErrInvalidContext
+	}
+
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+
+	var tokens []Token
+	var tokPtr *C.int32_t
+	var nTokensOut C.size_t
+
+	if maxTokens > 0 {
+		tokens = make([]Token, maxTokens)
+		tokPtr = (*C.int32_t)(unsafe.Pointer(&tokens[0]))
+	}
+
+	success := C.llama_go_state_load_file(c.handle, cPath, tokPtr, C.size_t(maxTokens), &nTokensOut)
+	if !success {
+		return nil, getLastError()
+	}
+
+	if maxTokens > 0 && nTokensOut > 0 {
+		return tokens[:nTokensOut], nil
+	}
+	return nil, nil
+}
 
 // StateSeqGetSize returns the size in bytes needed to save a sequence's state.
 func (c *Context) StateSeqGetSize(seqID int32) uint64 {
@@ -276,4 +389,60 @@ func (c *Context) StateSeqSetData(seqID int32, data []byte) (uint64, error) {
 	}
 
 	return uint64(read), nil
+}
+
+// StateSeqSaveFile saves a sequence's state to a file.
+// tokens: optional slice of tokens to save alongside the state.
+// Returns the number of bytes written (0 on failure).
+func (c *Context) StateSeqSaveFile(path string, seqID int32, tokens []Token) (uint64, error) {
+	if c.handle == nil {
+		return 0, ErrInvalidContext
+	}
+
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+
+	var tokPtr *C.int32_t
+	var nTokens C.size_t
+	if len(tokens) > 0 {
+		tokPtr = (*C.int32_t)(unsafe.Pointer(&tokens[0]))
+		nTokens = C.size_t(len(tokens))
+	}
+
+	written := C.llama_go_state_seq_save_file(c.handle, cPath, C.int32_t(seqID), tokPtr, nTokens)
+	if written == 0 {
+		return 0, getLastError()
+	}
+	return uint64(written), nil
+}
+
+// StateSeqLoadFile loads a sequence's state from a file.
+// If maxTokens > 0, also loads tokens into the returned slice.
+// Returns tokens read, bytes read, and error.
+func (c *Context) StateSeqLoadFile(path string, seqID int32, maxTokens int) ([]Token, uint64, error) {
+	if c.handle == nil {
+		return nil, 0, ErrInvalidContext
+	}
+
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+
+	var tokens []Token
+	var tokPtr *C.int32_t
+	var nTokensOut C.size_t
+
+	if maxTokens > 0 {
+		tokens = make([]Token, maxTokens)
+		tokPtr = (*C.int32_t)(unsafe.Pointer(&tokens[0]))
+	}
+
+	bytesRead := C.llama_go_state_seq_load_file(c.handle, cPath, C.int32_t(seqID), tokPtr, C.size_t(maxTokens), &nTokensOut)
+	if bytesRead == 0 {
+		return nil, 0, getLastError()
+	}
+
+	if maxTokens > 0 && nTokensOut > 0 {
+		return tokens[:nTokensOut], uint64(bytesRead), nil
+	}
+	return nil, uint64(bytesRead), nil
 }

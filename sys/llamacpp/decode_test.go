@@ -147,7 +147,9 @@ func TestDecodeMemoryClear(t *testing.T) {
 	t.Logf("Memory pos max before clear: %d", posMax)
 
 	// Clear memory
-	ctx.MemoryClear(true)
+	if err := ctx.MemoryClear(true); err != nil {
+		t.Fatalf("failed to clear memory: %v", err)
+	}
 
 	// Check memory is empty
 	posMax = ctx.MemorySeqPosMax(0)
@@ -191,8 +193,12 @@ func TestDecodeMemorySeqRm(t *testing.T) {
 	t.Logf("Memory pos max before remove: %d", posMaxBefore)
 
 	// Remove some tokens from sequence 0
-	ok := ctx.MemorySeqRm(0, 2, 5)
-	t.Logf("Memory seq rm returned: %v", ok)
+	err = ctx.MemorySeqRm(0, 2, 5)
+	if err != nil {
+		t.Logf("Memory seq rm returned error (may be expected): %v", err)
+	} else {
+		t.Log("Memory seq rm succeeded")
+	}
 
 	posMaxAfter := ctx.MemorySeqPosMax(0)
 	t.Logf("Memory pos max after remove: %d", posMaxAfter)
@@ -216,8 +222,10 @@ func TestDecodeSynchronize(t *testing.T) {
 	}
 	defer ctx.Close()
 
-	// Should not panic
-	ctx.Synchronize()
+	// Should not panic or error
+	if err := ctx.Synchronize(); err != nil {
+		t.Errorf("Synchronize failed: %v", err)
+	}
 }
 
 func TestDecodeMemoryCanShift(t *testing.T) {

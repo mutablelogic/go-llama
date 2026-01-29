@@ -76,6 +76,16 @@ void* llama_go_sampler_init_penalties(
     float penalty_present
 );
 
+// XTC (Exclude Top Choices) sampler for diversity
+void* llama_go_sampler_init_xtc(float p, float t, size_t min_keep, uint32_t seed);
+
+// Mirostat v2 sampler (simplified Mirostat)
+void* llama_go_sampler_init_mirostat_v2(
+    uint32_t seed,
+    float tau,
+    float eta
+);
+
 // Create a sampler chain
 void* llama_go_sampler_chain_init(bool no_perf);
 

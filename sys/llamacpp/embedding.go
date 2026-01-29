@@ -297,7 +297,9 @@ func (ctx *Context) ComputeEmbeddings(model *Model, texts []string, opts Embeddi
 	defer batch.Close()
 
 	// Clear KV cache before processing
-	ctx.MemoryClear(true)
+	if err := ctx.MemoryClear(true); err != nil {
+		return nil, err
+	}
 
 	// Process based on pooling type
 	if poolingType == PoolingNone {
@@ -325,11 +327,15 @@ func (ctx *Context) computeEmbeddingsNoPooling(batch *Batch, allTokens [][]Token
 		}
 
 		batch.Clear()
-		ctx.MemoryClear(true)
+		if err := ctx.MemoryClear(true); err != nil {
+			return nil, err
+		}
 
 		// Add all tokens, mark only the last one for logits
 		for j, tok := range tokens {
-			batch.Add(tok, int32(j), 0, j == len(tokens)-1)
+			if err := batch.Add(tok, int32(j), 0, j == len(tokens)-1); err != nil {
+				return nil, err
+			}
 		}
 
 		if err := batch.Decode(ctx); err != nil {
@@ -367,7 +373,9 @@ func (ctx *Context) computeEmbeddingsWithPooling(batch *Batch, allTokens [][]Tok
 		for j, tok := range tokens {
 			// Mark the last token of each sequence for output
 			isLast := j == len(tokens)-1
-			batch.Add(tok, int32(j), int32(seqID), isLast)
+			if err := batch.Add(tok, int32(j), int32(seqID), isLast); err != nil {
+				return nil, err
+			}
 		}
 	}
 

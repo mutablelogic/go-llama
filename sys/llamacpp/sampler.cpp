@@ -157,6 +157,18 @@ void* llama_go_sampler_init_penalties(
     return llama_sampler_init_penalties(penalty_last_n, penalty_repeat, penalty_freq, penalty_present);
 }
 
+void* llama_go_sampler_init_xtc(float p, float t, size_t min_keep, uint32_t seed) {
+    return llama_sampler_init_xtc(p, t, min_keep, seed);
+}
+
+void* llama_go_sampler_init_mirostat_v2(
+    uint32_t seed,
+    float tau,
+    float eta
+) {
+    return llama_sampler_init_mirostat_v2(seed, tau, eta);
+}
+
 void* llama_go_sampler_chain_init(bool no_perf) {
     struct llama_sampler_chain_params params = llama_sampler_chain_default_params();
     params.no_perf = no_perf;

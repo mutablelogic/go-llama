@@ -303,3 +303,37 @@ func TestSamplerChainLength(t *testing.T) {
 	}
 	t.Logf("Default sampler chain length: %d", length)
 }
+
+func TestXTCSampler(t *testing.T) {
+	llamacpp.Init()
+	defer llamacpp.Cleanup()
+
+	params := llamacpp.DefaultXTCParams()
+	params.Probability = 0.1
+	params.Threshold = 0.1
+
+	sampler, err := llamacpp.NewXTCSampler(params)
+	if err != nil {
+		t.Fatalf("failed to create XTC sampler: %v", err)
+	}
+	defer sampler.Close()
+
+	t.Log("XTC sampler created successfully")
+}
+
+func TestMirostatV2Sampler(t *testing.T) {
+	llamacpp.Init()
+	defer llamacpp.Cleanup()
+
+	params := llamacpp.DefaultMirostatV2Params()
+	params.Tau = 5.0
+	params.Eta = 0.1
+
+	sampler, err := llamacpp.NewMirostatV2Sampler(params)
+	if err != nil {
+		t.Fatalf("failed to create Mirostat v2 sampler: %v", err)
+	}
+	defer sampler.Close()
+
+	t.Log("Mirostat v2 sampler created successfully")
+}

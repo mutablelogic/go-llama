@@ -39,7 +39,9 @@ func TestMemorySeqKeep(t *testing.T) {
 	defer batch.Close()
 
 	for i, tok := range tokens {
-		batch.Add(tok, int32(i), 0, i == len(tokens)-1)
+		if err := batch.Add(tok, int32(i), 0, i == len(tokens)-1); err != nil {
+			t.Fatalf("failed to add token: %v", err)
+		}
 	}
 
 	if err := batch.Decode(ctx); err != nil {
@@ -96,7 +98,9 @@ func TestMemorySeqCopy(t *testing.T) {
 	defer batch.Close()
 
 	for i, tok := range tokens {
-		batch.Add(tok, int32(i), 0, i == len(tokens)-1)
+		if err := batch.Add(tok, int32(i), 0, i == len(tokens)-1); err != nil {
+			t.Fatalf("failed to add token: %v", err)
+		}
 	}
 
 	if err := batch.Decode(ctx); err != nil {
@@ -104,7 +108,9 @@ func TestMemorySeqCopy(t *testing.T) {
 	}
 
 	// Copy seq 0 to seq 1 (prefix sharing)
-	ctx.MemorySeqCp(0, 1, -1, -1)
+	if err := ctx.MemorySeqCp(0, 1, -1, -1); err != nil {
+		t.Fatalf("failed to copy sequence: %v", err)
+	}
 
 	// Both sequences should now have the same positions
 	posMax0 := ctx.MemorySeqPosMax(0)
@@ -148,7 +154,9 @@ func TestStateSeqSaveLoad(t *testing.T) {
 	defer batch.Close()
 
 	for i, tok := range tokens {
-		batch.Add(tok, int32(i), 0, i == len(tokens)-1)
+		if err := batch.Add(tok, int32(i), 0, i == len(tokens)-1); err != nil {
+			t.Fatalf("failed to add token: %v", err)
+		}
 	}
 
 	if err := batch.Decode(ctx); err != nil {
@@ -169,7 +177,9 @@ func TestStateSeqSaveLoad(t *testing.T) {
 	t.Logf("Saved %d bytes of state data", len(stateData))
 
 	// Clear the memory
-	ctx.MemoryClear(true)
+	if err := ctx.MemoryClear(true); err != nil {
+		t.Fatalf("failed to clear memory: %v", err)
+	}
 
 	// Verify memory is cleared
 	posMax := ctx.MemorySeqPosMax(0)
@@ -226,7 +236,9 @@ func TestPrefixCachingWorkflow(t *testing.T) {
 
 	// Process prefix on seq 0
 	for i, tok := range prefixTokens {
-		batch.Add(tok, int32(i), 0, i == len(prefixTokens)-1)
+		if err := batch.Add(tok, int32(i), 0, i == len(prefixTokens)-1); err != nil {
+			t.Fatalf("failed to add token: %v", err)
+		}
 	}
 
 	if err := batch.Decode(ctx); err != nil {
@@ -235,8 +247,12 @@ func TestPrefixCachingWorkflow(t *testing.T) {
 	t.Logf("Prefix processed: %d tokens, posMax=%d", len(prefixTokens), ctx.MemorySeqPosMax(0))
 
 	// Step 2: Copy prefix to other sequences for parallel generation
-	ctx.MemorySeqCp(0, 1, -1, -1)
-	ctx.MemorySeqCp(0, 2, -1, -1)
+	if err := ctx.MemorySeqCp(0, 1, -1, -1); err != nil {
+		t.Fatalf("failed to copy seq 0 to 1: %v", err)
+	}
+	if err := ctx.MemorySeqCp(0, 2, -1, -1); err != nil {
+		t.Fatalf("failed to copy seq 0 to 2: %v", err)
+	}
 	t.Logf("After copy - seq0=%d, seq1=%d, seq2=%d",
 		ctx.MemorySeqPosMax(0), ctx.MemorySeqPosMax(1), ctx.MemorySeqPosMax(2))
 
@@ -247,7 +263,9 @@ func TestPrefixCachingWorkflow(t *testing.T) {
 	// Add suffix1 to seq 1
 	batch.Clear()
 	for i, tok := range suffix1 {
-		batch.Add(tok, int32(len(prefixTokens)+i), 1, i == len(suffix1)-1)
+		if err := batch.Add(tok, int32(len(prefixTokens)+i), 1, i == len(suffix1)-1); err != nil {
+			t.Fatalf("failed to add suffix1 token: %v", err)
+		}
 	}
 	if err := batch.Decode(ctx); err != nil {
 		t.Fatalf("decode suffix1 failed: %v", err)
@@ -256,7 +274,9 @@ func TestPrefixCachingWorkflow(t *testing.T) {
 	// Add suffix2 to seq 2
 	batch.Clear()
 	for i, tok := range suffix2 {
-		batch.Add(tok, int32(len(prefixTokens)+i), 2, i == len(suffix2)-1)
+		if err := batch.Add(tok, int32(len(prefixTokens)+i), 2, i == len(suffix2)-1); err != nil {
+			t.Fatalf("failed to add suffix2 token: %v", err)
+		}
 	}
 	if err := batch.Decode(ctx); err != nil {
 		t.Fatalf("decode suffix2 failed: %v", err)

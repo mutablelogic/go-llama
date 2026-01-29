@@ -4,7 +4,10 @@ package llamacpp
 #include "decode.h"
 */
 import "C"
-import "unsafe"
+import (
+	"errors"
+	"unsafe"
+)
 
 ///////////////////////////////////////////////////////////////////////////////
 // LOGITS
@@ -75,38 +78,53 @@ func (ctx *Context) NEmbd() int32 {
 ///////////////////////////////////////////////////////////////////////////////
 // MEMORY (KV CACHE) MANAGEMENT
 
+// ErrPartialRemovalNotSupported is returned when partial KV cache removal is not supported.
+var ErrPartialRemovalNotSupported = errors.New("partial memory removal not supported")
+
 // MemoryClear clears the memory (KV cache) contents.
 // If clearData is true, the data buffers will also be cleared.
-func (ctx *Context) MemoryClear(clearData bool) {
-	if ctx.handle != nil {
-		C.llama_go_memory_clear(ctx.handle, C.bool(clearData))
+// Returns ErrInvalidContext if context is closed.
+func (ctx *Context) MemoryClear(clearData bool) error {
+	if ctx.handle == nil {
+		return ErrInvalidContext
 	}
+	C.llama_go_memory_clear(ctx.handle, C.bool(clearData))
+	return nil
 }
 
 // MemorySeqRm removes tokens from memory for a sequence.
 // seqID: sequence ID (-1 for all sequences)
 // p0: start position (inclusive, -1 for 0)
 // p1: end position (exclusive, -1 for end)
-// Returns false if partial removal is not supported.
-func (ctx *Context) MemorySeqRm(seqID, p0, p1 int32) bool {
+// Returns ErrInvalidContext if context is closed, ErrPartialRemovalNotSupported if partial removal is not supported.
+func (ctx *Context) MemorySeqRm(seqID, p0, p1 int32) error {
 	if ctx.handle == nil {
-		return false
+		return ErrInvalidContext
 	}
-	return bool(C.llama_go_memory_seq_rm(ctx.handle, C.int32_t(seqID), C.int32_t(p0), C.int32_t(p1)))
+	if !bool(C.llama_go_memory_seq_rm(ctx.handle, C.int32_t(seqID), C.int32_t(p0), C.int32_t(p1))) {
+		return ErrPartialRemovalNotSupported
+	}
+	return nil
 }
 
-// MemorySeqCp copies a sequence in memory
-func (ctx *Context) MemorySeqCp(seqIDSrc, seqIDDst, p0, p1 int32) {
-	if ctx.handle != nil {
-		C.llama_go_memory_seq_cp(ctx.handle, C.int32_t(seqIDSrc), C.int32_t(seqIDDst), C.int32_t(p0), C.int32_t(p1))
+// MemorySeqCp copies a sequence in memory.
+// Returns ErrInvalidContext if context is closed.
+func (ctx *Context) MemorySeqCp(seqIDSrc, seqIDDst, p0, p1 int32) error {
+	if ctx.handle == nil {
+		return ErrInvalidContext
 	}
+	C.llama_go_memory_seq_cp(ctx.handle, C.int32_t(seqIDSrc), C.int32_t(seqIDDst), C.int32_t(p0), C.int32_t(p1))
+	return nil
 }
 
-// MemorySeqAdd shifts positions in memory (for context shifting)
-func (ctx *Context) MemorySeqAdd(seqID, p0, p1, delta int32) {
-	if ctx.handle != nil {
-		C.llama_go_memory_seq_add(ctx.handle, C.int32_t(seqID), C.int32_t(p0), C.int32_t(p1), C.int32_t(delta))
+// MemorySeqAdd shifts positions in memory (for context shifting).
+// Returns ErrInvalidContext if context is closed.
+func (ctx *Context) MemorySeqAdd(seqID, p0, p1, delta int32) error {
+	if ctx.handle == nil {
+		return ErrInvalidContext
 	}
+	C.llama_go_memory_seq_add(ctx.handle, C.int32_t(seqID), C.int32_t(p0), C.int32_t(p1), C.int32_t(delta))
+	return nil
 }
 
 // MemorySeqPosMin returns the minimum position for a sequence (-1 if empty)
@@ -125,6 +143,22 @@ func (ctx *Context) MemorySeqPosMax(seqID int32) int32 {
 	return int32(C.llama_go_memory_seq_pos_max(ctx.handle, C.int32_t(seqID)))
 }
 
+// MemorySeqKeep removes all tokens that do not belong to the specified sequence.
+func (ctx *Context) MemorySeqKeep(seqID int32) {
+	if ctx.handle == nil {
+		return
+	}
+	C.llama_go_memory_seq_keep(ctx.handle, C.int32_t(seqID))
+}
+
+// MemorySeqDiv divides positions in a sequence range [p0, p1) by d (integer division).
+func (ctx *Context) MemorySeqDiv(seqID, p0, p1, d int32) {
+	if ctx.handle == nil {
+		return
+	}
+	C.llama_go_memory_seq_div(ctx.handle, C.int32_t(seqID), C.int32_t(p0), C.int32_t(p1), C.int32_t(d))
+}
+
 // MemoryCanShift returns whether the memory supports context shifting
 func (ctx *Context) MemoryCanShift() bool {
 	if ctx.handle == nil {
@@ -133,12 +167,26 @@ func (ctx *Context) MemoryCanShift() bool {
 	return bool(C.llama_go_memory_can_shift(ctx.handle))
 }
 
+// MemorySeqLength returns the number of tokens cached for a sequence.
+// Returns 0 if the sequence is empty.
+func (ctx *Context) MemorySeqLength(seqID int32) int32 {
+	min := ctx.MemorySeqPosMin(seqID)
+	max := ctx.MemorySeqPosMax(seqID)
+	if min < 0 || max < 0 {
+		return 0
+	}
+	return max - min + 1
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // SYNCHRONIZATION
 
-// Synchronize waits for all GPU operations to complete
-func (ctx *Context) Synchronize() {
-	if ctx.handle != nil {
-		C.llama_go_synchronize(ctx.handle)
+// Synchronize waits for all GPU operations to complete.
+// Returns ErrInvalidContext if context is closed.
+func (ctx *Context) Synchronize() error {
+	if ctx.handle == nil {
+		return ErrInvalidContext
 	}
+	C.llama_go_synchronize(ctx.handle)
+	return nil
 }

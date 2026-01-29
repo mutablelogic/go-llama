@@ -34,7 +34,7 @@ func TestSetEmbeddings(t *testing.T) {
 	defer llamacpp.Cleanup()
 
 	modelParams := llamacpp.DefaultModelParams()
-	model, err := llamacpp.LoadModel("../../testdata/stories260K.gguf", modelParams)
+	model, err := llamacpp.LoadModel("../../testdata/all-MiniLM-L6-v2-Q4_K_M.gguf", modelParams)
 	if err != nil {
 		t.Fatalf("failed to load model: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestPoolingType(t *testing.T) {
 	defer llamacpp.Cleanup()
 
 	modelParams := llamacpp.DefaultModelParams()
-	model, err := llamacpp.LoadModel("../../testdata/stories260K.gguf", modelParams)
+	model, err := llamacpp.LoadModel("../../testdata/all-MiniLM-L6-v2-Q4_K_M.gguf", modelParams)
 	if err != nil {
 		t.Fatalf("failed to load model: %v", err)
 	}
@@ -267,7 +267,7 @@ func TestGetEmbeddingsWithBatch(t *testing.T) {
 	defer llamacpp.Cleanup()
 
 	modelParams := llamacpp.DefaultModelParams()
-	model, err := llamacpp.LoadModel("../../testdata/stories260K.gguf", modelParams)
+	model, err := llamacpp.LoadModel("../../testdata/all-MiniLM-L6-v2-Q4_K_M.gguf", modelParams)
 	if err != nil {
 		t.Fatalf("failed to load model: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestEmbeddingWorkflow(t *testing.T) {
 	defer llamacpp.Cleanup()
 
 	modelParams := llamacpp.DefaultModelParams()
-	model, err := llamacpp.LoadModel("../../testdata/stories260K.gguf", modelParams)
+	model, err := llamacpp.LoadModel("../../testdata/all-MiniLM-L6-v2-Q4_K_M.gguf", modelParams)
 	if err != nil {
 		t.Fatalf("failed to load model: %v", err)
 	}

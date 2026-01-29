@@ -122,6 +122,14 @@ extern "C" uint32_t llama_go_context_n_seq_max(void* ctx_handle) {
     return llama_n_seq_max(ctx);
 }
 
+extern "C" uint32_t llama_go_context_n_ctx_seq(void* ctx_handle) {
+    if (ctx_handle == nullptr) {
+        return 0;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_n_ctx_seq(ctx);
+}
+
 extern "C" int32_t llama_go_context_n_threads(void* ctx_handle) {
     if (ctx_handle == nullptr) {
         return 0;
@@ -151,21 +159,51 @@ extern "C" const char* llama_go_ggml_type_name(int32_t type) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// MEMORY / KV CACHE OPERATIONS (additional)
-
-extern "C" void llama_go_memory_seq_keep(void* ctx_handle, int32_t seq_id) {
-    if (ctx_handle == nullptr) {
-        return;
-    }
-    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
-    llama_memory_t mem = llama_get_memory(ctx);
-    if (mem != nullptr) {
-        llama_memory_seq_keep(mem, seq_id);
-    }
-}
+// Note: Performance monitoring functions are implemented in runtime.cpp
+// Note: All memory/KV cache operations are implemented in decode.cpp
 
 ///////////////////////////////////////////////////////////////////////////////
 // STATE SAVE/LOAD
+
+extern "C" size_t llama_go_state_get_size(void* ctx_handle) {
+    if (ctx_handle == nullptr) {
+        return 0;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_state_get_size(ctx);
+}
+
+extern "C" size_t llama_go_state_get_data(void* ctx_handle, uint8_t* dst, size_t size) {
+    if (ctx_handle == nullptr || dst == nullptr) {
+        return 0;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_state_get_data(ctx, dst, size);
+}
+
+extern "C" size_t llama_go_state_set_data(void* ctx_handle, const uint8_t* src, size_t size) {
+    if (ctx_handle == nullptr || src == nullptr) {
+        return 0;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_state_set_data(ctx, src, size);
+}
+
+extern "C" bool llama_go_state_save_file(void* ctx_handle, const char* path, const int32_t* tokens, size_t n_tokens) {
+    if (ctx_handle == nullptr || path == nullptr) {
+        return false;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_state_save_file(ctx, path, reinterpret_cast<const llama_token*>(tokens), n_tokens);
+}
+
+extern "C" bool llama_go_state_load_file(void* ctx_handle, const char* path, int32_t* tokens_out, size_t n_token_capacity, size_t* n_tokens_out) {
+    if (ctx_handle == nullptr || path == nullptr) {
+        return false;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_state_load_file(ctx, path, reinterpret_cast<llama_token*>(tokens_out), n_token_capacity, n_tokens_out);
+}
 
 extern "C" size_t llama_go_state_seq_get_size(void* ctx_handle, int32_t seq_id) {
     if (ctx_handle == nullptr) {
@@ -189,4 +227,20 @@ extern "C" size_t llama_go_state_seq_set_data(void* ctx_handle, const uint8_t* s
     }
     llama_context* ctx = static_cast<llama_context*>(ctx_handle);
     return llama_state_seq_set_data(ctx, src, size, dest_seq_id);
+}
+
+extern "C" size_t llama_go_state_seq_save_file(void* ctx_handle, const char* path, int32_t seq_id, const int32_t* tokens, size_t n_tokens) {
+    if (ctx_handle == nullptr || path == nullptr) {
+        return 0;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_state_seq_save_file(ctx, path, seq_id, reinterpret_cast<const llama_token*>(tokens), n_tokens);
+}
+
+extern "C" size_t llama_go_state_seq_load_file(void* ctx_handle, const char* path, int32_t dest_seq_id, int32_t* tokens_out, size_t n_token_capacity, size_t* n_token_count_out) {
+    if (ctx_handle == nullptr || path == nullptr) {
+        return 0;
+    }
+    llama_context* ctx = static_cast<llama_context*>(ctx_handle);
+    return llama_state_seq_load_file(ctx, path, dest_seq_id, reinterpret_cast<llama_token*>(tokens_out), n_token_capacity, n_token_count_out);
 }

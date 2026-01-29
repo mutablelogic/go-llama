@@ -13,13 +13,13 @@ import (
 
 // ModelInfo contains runtime information about a loaded model.
 type ModelInfo struct {
-	NLayer     int32  // Total number of layers
-	NHead      int32  // Number of attention heads
-	NHeadKV    int32  // Number of KV heads (for GQA/MQA)
-	NEmbd      int32  // Embedding dimension
-	NCtxTrain  int32  // Training context length
-	NParams    uint64 // Total parameter count
-	ModelSize  uint64 // Model size in bytes
+	NLayer    int32  // Total number of layers
+	NHead     int32  // Number of attention heads
+	NHeadKV   int32  // Number of KV heads (for GQA/MQA)
+	NEmbd     int32  // Embedding dimension
+	NCtxTrain int32  // Training context length
+	NParams   uint64 // Total parameter count
+	ModelSize uint64 // Model size in bytes
 }
 
 // Info returns runtime information about the model.
@@ -182,18 +182,4 @@ func (ctx *Context) PerfReset() {
 	if ctx.handle != nil {
 		C.llama_go_perf_reset(ctx.handle)
 	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// KV CACHE INFO
-
-// MemorySeqLength returns the number of tokens cached for a sequence.
-// Returns 0 if the sequence is empty.
-func (ctx *Context) MemorySeqLength(seqID int32) int32 {
-	min := ctx.MemorySeqPosMin(seqID)
-	max := ctx.MemorySeqPosMax(seqID)
-	if min < 0 || max < 0 {
-		return 0
-	}
-	return max - min + 1
 }

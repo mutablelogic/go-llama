@@ -1,6 +1,7 @@
 package llamacpp_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/mutablelogic/go-llama/sys/llamacpp"
@@ -31,22 +32,22 @@ func TestBatchAdd(t *testing.T) {
 	defer batch.Close()
 
 	// Add a token
-	ok := batch.Add(1, 0, 0, true)
-	if !ok {
-		t.Fatal("failed to add token")
+	err = batch.Add(1, 0, 0, true)
+	if err != nil {
+		t.Fatalf("failed to add token: %v", err)
 	}
 	if batch.NumTokens() != 1 {
 		t.Errorf("expected 1 token, got %d", batch.NumTokens())
 	}
 
 	// Add more tokens
-	ok = batch.Add(2, 1, 0, false)
-	if !ok {
-		t.Fatal("failed to add second token")
+	err = batch.Add(2, 1, 0, false)
+	if err != nil {
+		t.Fatalf("failed to add second token: %v", err)
 	}
-	ok = batch.Add(3, 2, 0, true)
-	if !ok {
-		t.Fatal("failed to add third token")
+	err = batch.Add(3, 2, 0, true)
+	if err != nil {
+		t.Fatalf("failed to add third token: %v", err)
 	}
 	if batch.NumTokens() != 3 {
 		t.Errorf("expected 3 tokens, got %d", batch.NumTokens())
@@ -74,9 +75,9 @@ func TestBatchClear(t *testing.T) {
 	}
 
 	// Should be able to add again
-	ok := batch.Add(3, 0, 0, true)
-	if !ok {
-		t.Fatal("failed to add token after clear")
+	err = batch.Add(3, 0, 0, true)
+	if err != nil {
+		t.Fatalf("failed to add token after clear: %v", err)
 	}
 }
 
@@ -93,9 +94,12 @@ func TestBatchFull(t *testing.T) {
 	batch.Add(3, 2, 0, true)
 
 	// Should fail to add more
-	ok := batch.Add(4, 3, 0, true)
-	if ok {
-		t.Error("expected add to fail when batch is full")
+	err = batch.Add(4, 3, 0, true)
+	if err == nil {
+		t.Error("expected error when batch is full")
+	}
+	if !errors.Is(err, llamacpp.ErrBatchFull) {
+		t.Errorf("expected ErrBatchFull, got %v", err)
 	}
 	if batch.NumTokens() != 3 {
 		t.Errorf("expected 3 tokens, got %d", batch.NumTokens())
@@ -110,7 +114,10 @@ func TestBatchAddTokens(t *testing.T) {
 	defer batch.Close()
 
 	tokens := []llamacpp.Token{1, 2, 3, 4, 5}
-	added := batch.AddTokens(tokens, 0, 0, true)
+	added, err := batch.AddTokens(tokens, 0, 0, true)
+	if err != nil {
+		t.Fatalf("failed to add tokens: %v", err)
+	}
 
 	if added != 5 {
 		t.Errorf("expected 5 tokens added, got %d", added)
@@ -128,7 +135,10 @@ func TestBatchAddTokensPartial(t *testing.T) {
 	defer batch.Close()
 
 	tokens := []llamacpp.Token{1, 2, 3, 4, 5}
-	added := batch.AddTokens(tokens, 0, 0, true)
+	added, err := batch.AddTokens(tokens, 0, 0, true)
+	if err != nil {
+		t.Fatalf("failed to add tokens: %v", err)
+	}
 
 	if added != 3 {
 		t.Errorf("expected 3 tokens added (partial), got %d", added)
@@ -147,9 +157,9 @@ func TestBatchAddSeq(t *testing.T) {
 
 	// Add token with multiple sequence IDs
 	seqIDs := []int32{0, 1, 2}
-	ok := batch.AddSeq(42, 0, seqIDs, true)
-	if !ok {
-		t.Fatal("failed to add token with multiple sequences")
+	err = batch.AddSeq(42, 0, seqIDs, true)
+	if err != nil {
+		t.Fatalf("failed to add token with multiple sequences: %v", err)
 	}
 	if batch.NumTokens() != 1 {
 		t.Errorf("expected 1 token, got %d", batch.NumTokens())
@@ -169,8 +179,10 @@ func TestBatchSetLogits(t *testing.T) {
 	batch.Add(3, 2, 0, false)
 
 	// Set logits for last token
-	batch.SetLogits(2, true)
-	// Should not panic
+	err = batch.SetLogits(2, true)
+	if err != nil {
+		t.Fatalf("failed to set logits: %v", err)
+	}
 }
 
 func TestBatchFromTokens(t *testing.T) {
@@ -294,9 +306,9 @@ func TestBatchCapacityReuse(t *testing.T) {
 	// Fill and clear multiple times
 	for round := 0; round < 3; round++ {
 		for i := int32(0); i < 50; i++ {
-			ok := batch.Add(llamacpp.Token(i), i, 0, i == 49)
-			if !ok {
-				t.Fatalf("failed to add token at round %d, pos %d", round, i)
+			err := batch.Add(llamacpp.Token(i), i, 0, i == 49)
+			if err != nil {
+				t.Fatalf("failed to add token at round %d, pos %d: %v", round, i, err)
 			}
 		}
 		if batch.NumTokens() != 50 {

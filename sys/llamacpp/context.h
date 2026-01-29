@@ -55,6 +55,7 @@ uint32_t llama_go_context_n_ctx(void* ctx_handle);
 uint32_t llama_go_context_n_batch(void* ctx_handle);
 uint32_t llama_go_context_n_ubatch(void* ctx_handle);
 uint32_t llama_go_context_n_seq_max(void* ctx_handle);
+uint32_t llama_go_context_n_ctx_seq(void* ctx_handle);
 int32_t  llama_go_context_n_threads(void* ctx_handle);
 
 // Get the model associated with this context
@@ -64,13 +65,29 @@ void* llama_go_context_get_model(void* ctx_handle);
 const char* llama_go_ggml_type_name(int32_t type);
 
 ///////////////////////////////////////////////////////////////////////////////
-// MEMORY / KV CACHE OPERATIONS (additional for prefix caching)
+// STATE SAVE/LOAD
 
-// Remove all tokens that do not belong to the specified sequence
-void llama_go_memory_seq_keep(void* ctx_handle, int32_t seq_id);
+// Get the size needed to save full context state
+size_t llama_go_state_get_size(void* ctx_handle);
 
-///////////////////////////////////////////////////////////////////////////////
-// STATE SAVE/LOAD (for persistent prefix caching)
+// Copy full context state to buffer, returns bytes written
+size_t llama_go_state_get_data(void* ctx_handle, uint8_t* dst, size_t size);
+
+// Restore full context state from buffer, returns bytes read (0 on failure)
+size_t llama_go_state_set_data(void* ctx_handle, const uint8_t* src, size_t size);
+
+// Save full context state to file
+// tokens_out: buffer to receive tokens (can be NULL)
+// n_token_capacity: size of tokens_out buffer
+// Returns true on success
+bool llama_go_state_save_file(void* ctx_handle, const char* path, const int32_t* tokens, size_t n_tokens);
+
+// Load full context state from file
+// tokens_out: buffer to receive tokens (can be NULL)
+// n_token_capacity: size of tokens_out buffer
+// n_tokens_out: receives number of tokens read (can be NULL)
+// Returns true on success
+bool llama_go_state_load_file(void* ctx_handle, const char* path, int32_t* tokens_out, size_t n_token_capacity, size_t* n_tokens_out);
 
 // Get the size needed to save a sequence state
 size_t llama_go_state_seq_get_size(void* ctx_handle, int32_t seq_id);
@@ -80,6 +97,12 @@ size_t llama_go_state_seq_get_data(void* ctx_handle, uint8_t* dst, size_t size, 
 
 // Restore sequence state from buffer, returns bytes read (0 on failure)
 size_t llama_go_state_seq_set_data(void* ctx_handle, const uint8_t* src, size_t size, int32_t dest_seq_id);
+
+// Save sequence state to file, returns bytes written (0 on failure)
+size_t llama_go_state_seq_save_file(void* ctx_handle, const char* path, int32_t seq_id, const int32_t* tokens, size_t n_tokens);
+
+// Load sequence state from file, returns bytes read (0 on failure)
+size_t llama_go_state_seq_load_file(void* ctx_handle, const char* path, int32_t dest_seq_id, int32_t* tokens_out, size_t n_token_capacity, size_t* n_token_count_out);
 
 #ifdef __cplusplus
 }

@@ -98,6 +98,26 @@ void llama_go_memory_seq_cp(void* ctx_handle, int32_t seq_id_src, int32_t seq_id
     }
 }
 
+void llama_go_memory_seq_keep(void* ctx_handle, int32_t seq_id) {
+    if (ctx_handle) {
+        auto* ctx = static_cast<llama_context*>(ctx_handle);
+        llama_memory_t mem = llama_get_memory(ctx);
+        if (mem) {
+            llama_memory_seq_keep(mem, seq_id);
+        }
+    }
+}
+
+void llama_go_memory_seq_div(void* ctx_handle, int32_t seq_id, int32_t p0, int32_t p1, int32_t d) {
+    if (ctx_handle) {
+        auto* ctx = static_cast<llama_context*>(ctx_handle);
+        llama_memory_t mem = llama_get_memory(ctx);
+        if (mem) {
+            llama_memory_seq_div(mem, seq_id, p0, p1, d);
+        }
+    }
+}
+
 void llama_go_memory_seq_add(void* ctx_handle, int32_t seq_id, int32_t p0, int32_t p1, int32_t delta) {
     if (ctx_handle) {
         auto* ctx = static_cast<llama_context*>(ctx_handle);

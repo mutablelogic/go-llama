@@ -77,22 +77,28 @@ ifeq ($(GGML_CUDA),1)
 endif
 
 # Run all tests
-test: test-sys
+test: test-sys test-pkg
 
 # Test llamacpp bindings
+# Note: -p 1 is required because llama.cpp with Metal uses shared GPU state that isn't thread-safe
 test-sys: wrapper
 	@echo "Running tests (sys)"
-	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig ${GO} test ${TEST_FLAGS} ./sys/llamacpp/...
+	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig ${GO} test -p 1 ${TEST_FLAGS} ./sys/llamacpp/...
+
+# Test pkg (higher-level APIs)
+test-pkg:
+	@echo "Running tests (pkg)"
+	@${GO} test ${TEST_FLAGS} ./pkg/llamacpp/...
 
 # Run tests with verbose output
 test-v: wrapper
 	@echo "Running tests (verbose)"
-	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig ${GO} test ${TEST_FLAGS} -v ./sys/llamacpp/...
+	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig ${GO} test -p 1 ${TEST_FLAGS} -v ./sys/llamacpp/...
 
 #####################################################################
 # THIRD PARTY DEPENDENCIES
 
-.PHONY: libllama wrapper generate test test-sys test-v submodule submodule-clean docker-dep cmake-dep git-dep go-dep mkdir clean
+.PHONY: libllama wrapper generate test test-sys test-pkg test-v submodule submodule-clean docker-dep cmake-dep git-dep go-dep mkdir clean
 
 # Submodule checkout
 submodule: git-dep

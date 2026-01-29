@@ -39,6 +39,12 @@ bool llama_go_memory_seq_rm(void* ctx_handle, int32_t seq_id, int32_t p0, int32_
 // Copy sequence in memory
 void llama_go_memory_seq_cp(void* ctx_handle, int32_t seq_id_src, int32_t seq_id_dst, int32_t p0, int32_t p1);
 
+// Remove all tokens that do not belong to the specified sequence
+void llama_go_memory_seq_keep(void* ctx_handle, int32_t seq_id);
+
+// Divide positions in a sequence range [p0, p1) by d (integer division)
+void llama_go_memory_seq_div(void* ctx_handle, int32_t seq_id, int32_t p0, int32_t p1, int32_t d);
+
 // Shift positions in memory (for context shifting)
 void llama_go_memory_seq_add(void* ctx_handle, int32_t seq_id, int32_t p0, int32_t p1, int32_t delta);
 

@@ -23,6 +23,8 @@ set(WRAPPER_SOURCES
     decode.cpp
     embedding.cpp
     error.cpp
+    completion.cpp
+    grammar.cpp
     gpu.cpp
     init.cpp
     logging.cpp
@@ -41,6 +43,8 @@ set(WRAPPER_HEADERS
     decode.h
     embedding.h
     error.h
+    completion.h
+    grammar.h
     gpu.h
     init.h
     logging.h
