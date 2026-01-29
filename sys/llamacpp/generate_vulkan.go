@@ -1,0 +1,11 @@
+//go:build vulkan
+
+package whisper
+
+///////////////////////////////////////////////////////////////////////////////
+// CGO
+
+/*
+#cgo pkg-config: libwhisper-vulkan vulkan
+*/
+import "C"
