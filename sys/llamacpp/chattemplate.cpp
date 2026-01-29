@@ -1,4 +1,4 @@
-#include "chat.h"
+#include "chattemplate.h"
 #include "model.h"
 #include "error.h"
 #include "llama.h"

@@ -18,7 +18,7 @@ message(STATUS "  Cflags: ${LLAMA_CFLAGS}")
 # Source files
 set(WRAPPER_SOURCES
     batch.cpp
-    chat.cpp
+    chat_template.cpp
     context.cpp
     decode.cpp
     embedding.cpp
@@ -38,7 +38,7 @@ set(WRAPPER_SOURCES
 # Header files (for IDE support)
 set(WRAPPER_HEADERS
     batch.h
-    chat.h
+    chat_template.h
     context.h
     decode.h
     embedding.h
