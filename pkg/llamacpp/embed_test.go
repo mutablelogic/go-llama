@@ -39,6 +39,26 @@ func TestEmbedWithGenerativeModel(t *testing.T) {
 	t.Logf("Generative model embedding dimension: %d", resp.Dimension)
 }
 
+func TestEmbedWithNonEmbeddingModelReturnsError(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	path, err := filepath.Abs(testdataPath)
+	require.NoError(err)
+
+	l, err := llamacpp.New(path)
+	require.NoError(err)
+	defer l.Close()
+
+	_, err = l.Embed(context.Background(), schema.EmbedRequest{
+		Model: "stories260K.gguf",
+		Input: []string{"Hello, world!"},
+	})
+
+	require.Error(err)
+	assert.True(errors.Is(err, llama.ErrNotEmbeddingModel))
+}
+
 func TestEmbedModelNotFound(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)

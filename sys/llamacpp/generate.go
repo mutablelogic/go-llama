@@ -4,7 +4,7 @@ package llamacpp
 // CGO
 
 /*
-#cgo pkg-config: libllama go-llama
+#cgo pkg-config: libllama
 #cgo linux pkg-config: libllama-linux
 #cgo darwin pkg-config: libllama-darwin
 #cgo darwin CXXFLAGS: -DGGML_USE_METAL

@@ -4,7 +4,7 @@ package gguf
 // CGO
 
 /*
-#cgo pkg-config: libllama go-llama
+#cgo pkg-config: libllama
 #cgo linux pkg-config: libllama-linux
 #cgo darwin pkg-config: libllama-darwin
 #cgo windows pkg-config: libllama-windows

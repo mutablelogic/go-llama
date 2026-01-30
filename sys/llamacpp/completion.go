@@ -2,10 +2,15 @@ package llamacpp
 
 /*
 #include "completion.h"
+#include "llama.h"
+#include <stdbool.h>
 #include <stdlib.h>
+
+extern bool goAbortCallback(void* handle);
 */
 import "C"
 import (
+	"context"
 	"errors"
 	"strings"
 	"sync"
@@ -32,6 +37,9 @@ type CompletionOptions struct {
 
 	// EnablePrefixCaching reuses KV cache for matching prompt prefix
 	EnablePrefixCaching bool
+
+	// AbortContext cancels generation when done
+	AbortContext context.Context
 }
 
 // DefaultCompletionOptions returns sensible defaults
@@ -53,6 +61,10 @@ var (
 	callbackRegistry = make(map[uintptr]func(string) bool)
 	callbackCounter  uintptr
 	callbackMutex    sync.Mutex
+
+	abortRegistry = make(map[uintptr]context.Context)
+	abortCounter  uintptr
+	abortMutex    sync.Mutex
 )
 
 //export goTokenCallback
@@ -89,6 +101,44 @@ func unregisterCallback(handle uintptr) {
 	delete(callbackRegistry, handle)
 }
 
+//export goAbortCallback
+func goAbortCallback(handle unsafe.Pointer) C.bool {
+	if handle == nil {
+		return C.bool(false)
+	}
+
+	abortMutex.Lock()
+	ctx := abortRegistry[uintptr(handle)]
+	abortMutex.Unlock()
+
+	if ctx == nil {
+		return C.bool(false)
+	}
+
+	select {
+	case <-ctx.Done():
+		return C.bool(true)
+	default:
+		return C.bool(false)
+	}
+}
+
+func registerAbortContext(ctx context.Context) uintptr {
+	abortMutex.Lock()
+	defer abortMutex.Unlock()
+
+	abortCounter++
+	handle := abortCounter
+	abortRegistry[handle] = ctx
+	return handle
+}
+
+func unregisterAbortContext(handle uintptr) {
+	abortMutex.Lock()
+	defer abortMutex.Unlock()
+	delete(abortRegistry, handle)
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // TEXT GENERATION
 
@@ -115,6 +165,18 @@ func (ctx *Context) CompleteNative(prompt string, opts CompletionOptions) (strin
 		defer unregisterCallback(callbackHandle)
 	}
 
+	// Register abort callback if provided
+	var abortHandle uintptr
+	if opts.AbortContext != nil {
+		abortHandle = registerAbortContext(opts.AbortContext)
+		cCtx := (*C.struct_llama_context)(ctx.handle)
+		C.llama_set_abort_callback(cCtx, (C.ggml_abort_callback)(C.goAbortCallback), unsafe.Pointer(abortHandle))
+		defer func() {
+			C.llama_set_abort_callback(cCtx, nil, nil)
+			unregisterAbortContext(abortHandle)
+		}()
+	}
+
 	// Convert SamplerParams to C struct
 	cParams := C.llama_go_completion_default_params()
 	cParams.seed = C.uint32_t(opts.SamplerParams.Seed)
@@ -126,7 +188,6 @@ func (ctx *Context) CompleteNative(prompt string, opts CompletionOptions) (strin
 	cParams.repeat_last_n = C.int32_t(opts.SamplerParams.RepeatLastN)
 	cParams.frequency_penalty = C.float(opts.SamplerParams.FrequencyPenalty)
 	cParams.presence_penalty = C.float(opts.SamplerParams.PresencePenalty)
-
 	cParams.max_tokens = C.int32_t(opts.MaxTokens)
 	cParams.enable_prefix_caching = C.bool(opts.EnablePrefixCaching)
 
