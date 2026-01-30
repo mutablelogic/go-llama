@@ -4,14 +4,19 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	// Packages
 	kong "github.com/alecthomas/kong"
+	client "github.com/mutablelogic/go-client"
 	otel "github.com/mutablelogic/go-client/pkg/otel"
+	httpclient "github.com/mutablelogic/go-llama/pkg/llamacpp/httpclient"
 	server "github.com/mutablelogic/go-server"
 	logger "github.com/mutablelogic/go-server/pkg/logger"
 	trace "go.opentelemetry.io/otel/trace"
@@ -50,6 +55,10 @@ type Globals struct {
 type CLI struct {
 	Globals
 	GpuInfo GpuInfoCmd `cmd:"gpuinfo" help:"Show GPU information"`
+	ModelCommands
+	CompletionCommands
+	EmbedCommands
+	TokenizerCommands
 	ServerCommands
 }
 
@@ -116,6 +125,60 @@ func run(ctx *kong.Context, globals *Globals) int {
 	}
 
 	return 0
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// PRIVATE METHODS
+
+func (g *Globals) Client() (*httpclient.Client, error) {
+	endpoint, opts, err := g.clientEndpoint("gollama")
+	if err != nil {
+		return nil, err
+	}
+	return httpclient.New(endpoint, opts...)
+}
+
+// clientEndpoint returns the endpoint URL and client options for the given path suffix.
+func (g *Globals) clientEndpoint(suffix string) (string, []client.ClientOpt, error) {
+	scheme := "http"
+	host, port, err := net.SplitHostPort(g.HTTP.Addr)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Default host to localhost if empty (e.g., ":8080")
+	if host == "" {
+		host = "localhost"
+	}
+
+	// Parse port
+	portn, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return "", nil, err
+	}
+	if portn == 443 {
+		scheme = "https"
+	}
+
+	// Client options
+	opts := []client.ClientOpt{}
+	if g.Debug {
+		opts = append(opts, client.OptTrace(os.Stderr, true))
+	}
+	if g.tracer != nil {
+		opts = append(opts, client.OptTracer(g.tracer))
+	}
+	if g.HTTP.Timeout > 0 {
+		opts = append(opts, client.OptTimeout(g.HTTP.Timeout))
+	}
+
+	// Set prefix
+	prefix, err := url.JoinPath("/", g.HTTP.Prefix, suffix)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return fmt.Sprintf("%s://%s:%v%s", scheme, host, portn, prefix), opts, nil
 }
 
 func isTerminal(w io.Writer) bool {
