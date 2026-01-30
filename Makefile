@@ -15,11 +15,21 @@ BUILD_JOBS ?= -j
 PREFIX ?= ${BUILD_DIR}/install
 CMAKE_FLAGS = -DBUILD_SHARED_LIBS=OFF
 
-# If GGML_CUDA is set, then add a cuda tag for the go ${BUILD FLAGS}
+# Build flags
+BUILD_MODULE := $(shell cat go.mod | head -1 | cut -d ' ' -f 2)
+BUILD_LD_FLAGS := -X $(BUILD_MODULE)/pkg/version.GitSource=${BUILD_MODULE}
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GitTag=$(shell git describe --tags --always)
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GitBranch=$(shell git name-rev HEAD --name-only --always)
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GitHash=$(shell git rev-parse HEAD)
+BUILD_LD_FLAGS += -X $(BUILD_MODULE)/pkg/version.GoBuildTime=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+BUILD_FLAGS = -ldflags "-s -w $(BUILD_LD_FLAGS)" 
+
+# If GGML_CUDA is set, then add a cuda tag for the go ${BUILD_FLAGS}
 # Target specific CUDA architectures
 # https://developer.nvidia.com/cuda/gpus
 ifeq ($(GGML_CUDA),1)
 	CMAKE_FLAGS += -DGGML_CUDA=ON
+	BUILD_FLAGS += -tags cuda
 	BUILD_JOBS = -j2
 	ifeq ($(ARCH),arm64)
 		CMAKE_FLAGS += '-DCMAKE_CUDA_ARCHITECTURES=87'
@@ -29,15 +39,24 @@ ifeq ($(GGML_CUDA),1)
 	endif
 endif
 
-# If GGML_VULKAN is set, then add a vulkan tag for the go ${BUILD FLAGS}
+# If GGML_VULKAN is set, then add a vulkan tag for the go ${BUILD_FLAGS}
 ifeq ($(GGML_VULKAN),1)
 	CMAKE_FLAGS += -DGGML_VULKAN=ON
+	BUILD_FLAGS += -tags vulkan
 endif
 
 # If GGML_NATIVE is set to OFF, disable native CPU optimizations (for portable builds)
 ifeq ($(GGML_NATIVE),OFF)
 	CMAKE_FLAGS += -DGGML_NATIVE=OFF
 endif
+
+#####################################################################
+# BUILD
+
+# Make gollama (includes server run command)
+gollama: wrapper
+	@echo "Building gollama"
+	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig CGO_LDFLAGS_ALLOW="-(W|D).*" ${GO} build ${BUILD_FLAGS} -o ${BUILD_DIR}/gollama ./cmd/gollama
 
 #####################################################################
 # BUILD STATIC LIBRARIES
