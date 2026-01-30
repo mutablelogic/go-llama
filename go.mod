@@ -6,7 +6,6 @@ require (
 	github.com/alecthomas/kong v1.13.0
 	github.com/mutablelogic/go-client v1.3.5
 	github.com/mutablelogic/go-server v1.5.18
-	github.com/mutablelogic/go-whisper v0.0.39
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/trace v1.39.0

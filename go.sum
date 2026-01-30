@@ -123,8 +123,6 @@ github.com/mutablelogic/go-pg v1.1.2 h1:oHtC//mU4dnUdd6hYRt2oGITfpVh/BA51U/bKap+
 github.com/mutablelogic/go-pg v1.1.2/go.mod h1:qwdZHszWb7LySx+ILAeWkLC/rQxyCGirQ8FGHw8eBvI=
 github.com/mutablelogic/go-server v1.5.18 h1:UKpJQReabHFMz1U/gbOq/+Q0C0ZzklVBalvs5FFk9NQ=
 github.com/mutablelogic/go-server v1.5.18/go.mod h1:swZf3T0eGe9VEE0Ki37WknpN+XxTGj2Xn6EP7BJm9x0=
-github.com/mutablelogic/go-whisper v0.0.39 h1:l064L4BJuhCc5eJA54sanmZ+5Bm1sfxO6x7EHQMRELw=
-github.com/mutablelogic/go-whisper v0.0.39/go.mod h1:iOMw8nfd/j1MCYXRGlim5r+RH32aB4Ynx/o9++bmVZU=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
