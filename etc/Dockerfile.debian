@@ -1,0 +1,46 @@
+ARG BASE_TAG=trixie-slim
+ARG BASE_DEV_CONTAINER=debian:${BASE_TAG}
+ARG BASE_RUN_CONTAINER=debian:${BASE_TAG}
+ARG GO_VERSION=1.25.6
+ARG ARCH
+ARG OS
+
+# Setup build container
+FROM ${BASE_DEV_CONTAINER} AS build
+ARG GO_VERSION
+ARG ARCH
+ARG OS
+
+RUN apt -y update \
+    && apt install -y ca-certificates build-essential libgomp1 cmake git pkg-config nasm curl \
+    && apt install -y libvulkan-dev glslang-tools glslc
+
+# Install go
+RUN curl -sL https://golang.org/dl/go${GO_VERSION}.${OS}-${ARCH}.tar.gz | tar -C /usr/local -xz
+ENV PATH=$PATH:/usr/local/go/bin
+
+# Copy source
+WORKDIR /app
+COPY . .
+
+# Make gollama with Vulkan support (disable native CPU optimizations for portability)
+ENV GGML_VULKAN=1
+RUN make clean && GGML_NATIVE=OFF make gollama
+
+# Setup runtime container
+FROM ${BASE_RUN_CONTAINER} AS runtime
+RUN apt -y update \
+    && apt install -y ca-certificates libgomp1 \
+    && apt install -y libmp3lame0 libopus0 libvorbis0a libvorbisenc2 libvpx9 libx264-164 libx265-215 libdav1d7 libnuma1 \
+    && apt install -y libvulkan1 libshaderc1 libplacebo349 vulkan-tools mesa-vulkan-drivers
+
+# Copy built gollama binary
+COPY --from=build --chmod=755 /app/build/gollama /usr/local/bin/gollama
+
+# Container environment
+ENV GOLLAMA_DIR="/data"
+ENV GOLLAMA_ADDR="0.0.0.0:8081"
+VOLUME [ "/data" ]
+ENTRYPOINT [ "/usr/local/bin/gollama" ]
+STOPSIGNAL SIGQUIT
+EXPOSE 8081
