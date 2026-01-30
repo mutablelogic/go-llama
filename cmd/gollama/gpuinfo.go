@@ -17,24 +17,18 @@ type GpuInfoCmd struct{}
 type GPUInfoResponse struct {
 	Backend string    `json:"backend"`
 	Devices []GPUInfo `json:"devices"`
-	Support struct {
-		Metal  bool `json:"metal"`
-		CUDA   bool `json:"cuda"`
-		Vulkan bool `json:"vulkan"`
-	} `json:"support"`
+}
+
+type MemoryInfo struct {
+	Bytes     int64 `json:"bytes"`
+	Megabytes int64 `json:"megabytes"`
 }
 
 type GPUInfo struct {
-	DeviceID    int32  `json:"device_id"`
-	DeviceName  string `json:"device_name"`
-	TotalMemory struct {
-		Bytes     int64 `json:"bytes"`
-		Megabytes int64 `json:"megabytes"`
-	} `json:"total_memory,omitempty"`
-	FreeMemory struct {
-		Bytes     int64 `json:"bytes"`
-		Megabytes int64 `json:"megabytes"`
-	} `json:"free_memory,omitempty"`
+	DeviceID    int32       `json:"device_id"`
+	DeviceName  string      `json:"device_name"`
+	TotalMemory *MemoryInfo `json:"total_memory,omitempty"`
+	FreeMemory  *MemoryInfo `json:"free_memory,omitempty"`
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -48,15 +42,6 @@ func (cmd *GpuInfoCmd) Run(globals *Globals) error {
 	// Create response structure
 	response := GPUInfoResponse{
 		Backend: llamacpp.GPUBackendName(),
-		Support: struct {
-			Metal  bool `json:"metal"`
-			CUDA   bool `json:"cuda"`
-			Vulkan bool `json:"vulkan"`
-		}{
-			Metal:  llamacpp.HasMetal(),
-			CUDA:   llamacpp.HasCUDA(),
-			Vulkan: llamacpp.HasVulkan(),
-		},
 	}
 
 	// Get GPU device information
@@ -69,22 +54,16 @@ func (cmd *GpuInfoCmd) Run(globals *Globals) error {
 			DeviceName: gpu.DeviceName,
 		}
 
-		// Only include memory info if available
-		if gpu.TotalMemoryBytes >= 0 {
-			deviceInfo.TotalMemory = struct {
-				Bytes     int64 `json:"bytes"`
-				Megabytes int64 `json:"megabytes"`
-			}{
+		// Only include memory info if available and non-zero
+		if gpu.TotalMemoryBytes > 0 {
+			deviceInfo.TotalMemory = &MemoryInfo{
 				Bytes:     gpu.TotalMemoryBytes,
 				Megabytes: gpu.TotalMemoryMB(),
 			}
 		}
 
-		if gpu.FreeMemoryBytes >= 0 {
-			deviceInfo.FreeMemory = struct {
-				Bytes     int64 `json:"bytes"`
-				Megabytes int64 `json:"megabytes"`
-			}{
+		if gpu.FreeMemoryBytes > 0 {
+			deviceInfo.FreeMemory = &MemoryInfo{
 				Bytes:     gpu.FreeMemoryBytes,
 				Megabytes: gpu.FreeMemoryMB(),
 			}
