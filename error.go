@@ -25,6 +25,8 @@ const (
 	ErrNoKVSlot
 	ErrOpenFailed
 	ErrNotFound
+	ErrModelNotLoaded
+	ErrNotEmbeddingModel
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -58,6 +60,10 @@ func (e Error) String() string {
 		return "failed to open file"
 	case ErrNotFound:
 		return "not found"
+	case ErrModelNotLoaded:
+		return "model not loaded"
+	case ErrNotEmbeddingModel:
+		return "model does not support embeddings"
 	default:
 		return fmt.Sprintf("error(%d)", int(e))
 	}

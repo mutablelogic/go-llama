@@ -8,7 +8,6 @@ import (
 )
 
 func TestComputeEmbedding(t *testing.T) {
-	t.Skip("TODO: BERT embedding model causes crash - needs investigation")
 	llamacpp.Init()
 	defer llamacpp.Cleanup()
 
@@ -50,7 +49,6 @@ func TestComputeEmbedding(t *testing.T) {
 }
 
 func TestComputeEmbeddings(t *testing.T) {
-	t.Skip("TODO: BERT embedding model causes crash - needs investigation")
 	llamacpp.Init()
 	defer llamacpp.Cleanup()
 
@@ -120,7 +118,6 @@ func TestComputeEmbeddingsEmpty(t *testing.T) {
 }
 
 func TestSimilarityMatrix(t *testing.T) {
-	t.Skip("TODO: BERT embedding model causes crash - needs investigation")
 	llamacpp.Init()
 	defer llamacpp.Cleanup()
 
@@ -165,7 +162,6 @@ func TestSimilarityMatrix(t *testing.T) {
 }
 
 func TestMostSimilar(t *testing.T) {
-	t.Skip("TODO: BERT embedding model causes crash - needs investigation")
 	llamacpp.Init()
 	defer llamacpp.Cleanup()
 

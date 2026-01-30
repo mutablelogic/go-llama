@@ -6,6 +6,25 @@ import (
 	"github.com/mutablelogic/go-llama/sys/llamacpp"
 )
 
+const kvCacheQuantBlockSize = 32
+
+func skipIfKVQuantUnsupported(t *testing.T, model *llamacpp.Model, typeName string) {
+	if model == nil {
+		t.Skipf("%s KV cache test skipped: model is nil", typeName)
+	}
+
+	nEmb := model.NEmbd()
+	nHead := model.NHead()
+	if nEmb <= 0 || nHead <= 0 {
+		t.Skipf("%s KV cache test skipped: invalid model dimensions n_embd=%d n_head=%d", typeName, nEmb, nHead)
+	}
+
+	nEmbHeadK := nEmb / nHead
+	if nEmbHeadK == 0 || (nEmbHeadK%kvCacheQuantBlockSize) != 0 {
+		t.Skipf("%s KV cache test skipped: n_embd_head_k=%d not divisible by block size %d", typeName, nEmbHeadK, kvCacheQuantBlockSize)
+	}
+}
+
 func TestGGMLTypeString(t *testing.T) {
 	tests := []struct {
 		typ  llamacpp.GGMLType
@@ -74,6 +93,8 @@ func TestKVCacheQuantizationQ8(t *testing.T) {
 	}
 	defer model.Close()
 
+	skipIfKVQuantUnsupported(t, model, "Q8_0")
+
 	ctxParams := llamacpp.DefaultContextParams()
 	ctxParams.TypeK = llamacpp.GGMLTypeQ8_0
 	ctxParams.TypeV = llamacpp.GGMLTypeQ8_0
@@ -121,6 +142,8 @@ func TestKVCacheQuantizationQ4(t *testing.T) {
 	}
 	defer model.Close()
 
+	skipIfKVQuantUnsupported(t, model, "Q4_0")
+
 	ctxParams := llamacpp.DefaultContextParams()
 	ctxParams.TypeK = llamacpp.GGMLTypeQ4_0
 	ctxParams.TypeV = llamacpp.GGMLTypeQ4_0
@@ -154,6 +177,8 @@ func TestKVCacheMixedTypes(t *testing.T) {
 		t.Fatalf("failed to load model: %v", err)
 	}
 	defer model.Close()
+
+	skipIfKVQuantUnsupported(t, model, "Q8_0/Q4_0")
 
 	ctxParams := llamacpp.DefaultContextParams()
 	ctxParams.TypeK = llamacpp.GGMLTypeQ8_0

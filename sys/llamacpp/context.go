@@ -48,22 +48,42 @@ type Context struct {
 	typeV  GGMLType // KV cache V type (for reference)
 }
 
+// AttentionType specifies the attention pattern for embeddings
+type AttentionType int32
+
+const (
+	AttentionUnspecified AttentionType = -1 // Auto-detect from model
+	AttentionCausal      AttentionType = 0  // Causal/autoregressive (GPT-style)
+	AttentionNonCausal   AttentionType = 1  // Non-causal/bidirectional (BERT-style)
+)
+
+// FlashAttnType specifies flash attention mode
+type FlashAttnType int32
+
+const (
+	FlashAttnAuto     FlashAttnType = -1 // Auto-detect (recommended for embedding models)
+	FlashAttnDisabled FlashAttnType = 0  // Disable flash attention
+	FlashAttnEnabled  FlashAttnType = 1  // Enable flash attention
+)
+
 // ContextParams contains configuration for creating a context
 type ContextParams struct {
-	NCtx          uint32   // Context size (0 = from model)
-	NBatch        uint32   // Logical maximum batch size
-	NUBatch       uint32   // Physical maximum batch size
-	NSeqMax       uint32   // Max number of sequences
-	NThreads      int32    // Threads for generation
-	NThreadsBatch int32    // Threads for batch processing
-	RopeFreqBase  float32  // RoPE base frequency (0 = from model)
-	RopeFreqScale float32  // RoPE frequency scaling (0 = from model)
-	TypeK         GGMLType // KV cache K type (-1 = default F16)
-	TypeV         GGMLType // KV cache V type (-1 = default F16)
-	Embeddings    bool     // Extract embeddings
-	OffloadKQV    bool     // Offload KQV ops to GPU
-	FlashAttn     bool     // Use flash attention
-	NoPerf        bool     // Disable performance timings
+	NCtx          uint32        // Context size (0 = from model)
+	NBatch        uint32        // Logical maximum batch size
+	NUBatch       uint32        // Physical maximum batch size
+	NSeqMax       uint32        // Max number of sequences
+	NThreads      int32         // Threads for generation
+	NThreadsBatch int32         // Threads for batch processing
+	RopeFreqBase  float32       // RoPE base frequency (0 = from model)
+	RopeFreqScale float32       // RoPE frequency scaling (0 = from model)
+	TypeK         GGMLType      // KV cache K type (-1 = default F16)
+	TypeV         GGMLType      // KV cache V type (-1 = default F16)
+	AttentionType AttentionType // Attention type for embeddings (-1 = auto)
+	FlashAttn     FlashAttnType // Flash attention mode (-1 = auto, 0 = disabled, 1 = enabled)
+	Embeddings    bool          // Extract embeddings
+	OffloadKQV    bool          // Offload KQV ops to GPU
+	KVUnified     bool          // Use unified KV cache (required for encoder/BERT models)
+	NoPerf        bool          // Disable performance timings
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -83,9 +103,11 @@ func DefaultContextParams() ContextParams {
 		RopeFreqScale: float32(cParams.rope_freq_scale),
 		TypeK:         GGMLType(cParams.type_k),
 		TypeV:         GGMLType(cParams.type_v),
+		AttentionType: AttentionType(cParams.attention_type),
+		FlashAttn:     FlashAttnType(cParams.flash_attn),
 		Embeddings:    bool(cParams.embeddings),
 		OffloadKQV:    bool(cParams.offload_kqv),
-		FlashAttn:     bool(cParams.flash_attn),
+		KVUnified:     bool(cParams.kv_unified),
 		NoPerf:        bool(cParams.no_perf),
 	}
 }
@@ -113,9 +135,11 @@ func NewContext(model *Model, params ContextParams) (*Context, error) {
 		rope_freq_scale: C.float(params.RopeFreqScale),
 		type_k:          C.int32_t(params.TypeK),
 		type_v:          C.int32_t(params.TypeV),
+		attention_type:  C.int32_t(params.AttentionType),
+		flash_attn:      C.int32_t(params.FlashAttn),
 		embeddings:      C.bool(params.Embeddings),
 		offload_kqv:     C.bool(params.OffloadKQV),
-		flash_attn:      C.bool(params.FlashAttn),
+		kv_unified:      C.bool(params.KVUnified),
 		no_perf:         C.bool(params.NoPerf),
 	}
 
