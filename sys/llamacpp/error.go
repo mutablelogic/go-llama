@@ -4,21 +4,25 @@ package llamacpp
 #include "error.h"
 */
 import "C"
-import "errors"
+import (
+	"errors"
+
+	llama "github.com/mutablelogic/go-llama"
+)
 
 ///////////////////////////////////////////////////////////////////////////////
 // ERRORS
 
 var (
-	ErrInvalidModel    = errors.New("invalid model")
-	ErrInvalidContext  = errors.New("invalid context")
-	ErrInvalidArgument = errors.New("invalid argument")
-	ErrNoKVSlot        = errors.New("no KV cache slot available")
-	ErrBatchFull       = errors.New("batch is full")
-	ErrInvalidBatch    = errors.New("invalid batch")
-	ErrKeyNotFound     = errors.New("metadata key not found")
-	ErrIndexOutOfRange = errors.New("index out of range")
-	ErrInvalidToken    = errors.New("invalid token")
+	ErrInvalidModel    = llama.ErrInvalidModel
+	ErrInvalidContext  = llama.ErrInvalidContext
+	ErrInvalidArgument = llama.ErrInvalidArgument
+	ErrNoKVSlot        = llama.ErrNoKVSlot
+	ErrBatchFull       = llama.ErrBatchFull
+	ErrInvalidBatch    = llama.ErrInvalidBatch
+	ErrKeyNotFound     = llama.ErrKeyNotFound
+	ErrIndexOutOfRange = llama.ErrIndexOutOfRange
+	ErrInvalidToken    = llama.ErrInvalidToken
 )
 
 ///////////////////////////////////////////////////////////////////////////////

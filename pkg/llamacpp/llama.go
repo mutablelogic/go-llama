@@ -1,11 +1,15 @@
 package llamacpp
 
 import (
+	"context"
 	"fmt"
-	"path/filepath"
 	"sync"
 
-	"github.com/mutablelogic/go-llama/sys/llamacpp"
+	// Packages
+	otel "github.com/mutablelogic/go-client/pkg/otel"
+	schema "github.com/mutablelogic/go-llama/pkg/llamacpp/schema"
+	store "github.com/mutablelogic/go-llama/pkg/llamacpp/store"
+	llamacpp "github.com/mutablelogic/go-llama/sys/llamacpp"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -13,15 +17,10 @@ import (
 
 // Llama is a singleton that manages the llama.cpp runtime and models
 type Llama struct {
-	mu         sync.RWMutex
-	modelsPath string
-	models     map[string]*llamacpp.Model
-	opts       Options
-}
-
-// Options contains configuration for the Llama instance
-type Options struct {
-	// Add options here - to be discussed
+	sync.RWMutex
+	opt
+	*store.Store
+	cached map[string]*schema.CachedModel
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -30,140 +29,99 @@ type Options struct {
 var (
 	instance *Llama
 	once     sync.Once
-	initErr  error
 )
 
 ///////////////////////////////////////////////////////////////////////////////
 // LIFECYCLE
 
 // New creates or returns the singleton Llama instance
-func New(modelsPath string, opts ...Option) (*Llama, error) {
+func New(path string, opts ...Opt) (*Llama, error) {
+	// Initialize llama.cpp runtime
+	var result error
 	once.Do(func() {
-		// Initialize llama.cpp runtime
 		if err := llamacpp.Init(); err != nil {
-			initErr = fmt.Errorf("failed to initialize llama.cpp: %w", err)
+			result = fmt.Errorf("failed to initialize llama.cpp: %w", err)
 			return
 		}
-
-		// Create instance
-		instance = &Llama{
-			modelsPath: modelsPath,
-			models:     make(map[string]*llamacpp.Model),
-			opts:       Options{},
-		}
-
-		// Apply options
-		for _, opt := range opts {
-			if err := opt(instance); err != nil {
-				initErr = err
-				return
-			}
-		}
 	})
-
-	if initErr != nil {
-		return nil, initErr
+	if result != nil {
+		return nil, result
+	} else {
+		instance = &Llama{
+			cached: make(map[string]*schema.CachedModel),
+		}
 	}
 
+	// Create a model store
+	if store, err := store.New(path); err != nil {
+		return nil, err
+	} else {
+		instance.Store = store
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		if err := opt(&instance.opt); err != nil {
+			return nil, err
+		}
+	}
+
+	// Return success
 	return instance, nil
 }
 
 // Close releases all resources and cleans up the llama.cpp runtime
 func (l *Llama) Close() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	// Close all loaded models
-	for name, model := range l.models {
-		if err := model.Close(); err != nil {
-			// Log error but continue cleanup
-			_ = fmt.Errorf("failed to close model %s: %w", name, err)
-		}
+	if l == nil {
+		return nil
 	}
-	l.models = make(map[string]*llamacpp.Model)
+
+	// Lock the instance
+	l.Lock()
+	defer l.Unlock()
+
+	// Unload all cached models
+	for path, cached := range l.cached {
+		if cached.Handle != nil {
+			cached.Handle.Close()
+		}
+		delete(l.cached, path)
+	}
 
 	// Cleanup llama.cpp runtime
 	llamacpp.Cleanup()
 
+	// Set instance to nil
+	instance = nil
+
+	// Return success
 	return nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// MODEL MANAGEMENT
+// PUBLIC METHODS
 
-// LoadModel loads a model by filename from the models directory
-// Returns cached model if already loaded
-func (l *Llama) LoadModel(filename string, opts ...ModelOption) (*llamacpp.Model, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// GPUInfo returns information about available GPU devices and the backend.
+func (l *Llama) GPUInfo(ctx context.Context) *schema.GPUInfo {
+	_, endSpan := otel.StartSpan(l.tracer, ctx, schema.SpanName("GPUInfo"))
+	defer func() { endSpan(nil) }()
 
-	// Check cache
-	if model, ok := l.models[filename]; ok {
-		return model, nil
+	// Get device list from low-level API
+	sysDevices := llamacpp.GPUList()
+
+	// Convert to schema types
+	devices := make([]schema.GPUDevice, len(sysDevices))
+	for i, d := range sysDevices {
+		devices[i] = schema.GPUDevice{
+			ID:               d.DeviceID,
+			Name:             d.DeviceName,
+			FreeMemoryBytes:  d.FreeMemoryBytes,
+			TotalMemoryBytes: d.TotalMemoryBytes,
+		}
 	}
 
-	// Load model
-	path := filepath.Join(l.modelsPath, filename)
-	params := llamacpp.DefaultModelParams()
-	
-	// Apply model-specific options
-	for _, opt := range opts {
-		opt(&params)
-	}
-
-	model, err := llamacpp.LoadModel(path, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load model %s: %w", filename, err)
-	}
-
-	// Cache model
-	l.models[filename] = model
-
-	return model, nil
-}
-
-// UnloadModel closes and removes a model from the cache
-func (l *Llama) UnloadModel(filename string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	model, ok := l.models[filename]
-	if !ok {
-		return fmt.Errorf("model %s not loaded", filename)
-	}
-
-	if err := model.Close(); err != nil {
-		return fmt.Errorf("failed to close model %s: %w", filename, err)
-	}
-
-	delete(l.models, filename)
-	return nil
-}
-
-// Models returns a list of currently loaded model filenames
-func (l *Llama) Models() []string {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-
-	names := make([]string, 0, len(l.models))
-	for name := range l.models {
-		names = append(names, name)
-	}
-	return names
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// OPTION PATTERN
-
-// Option configures a Llama instance
-type Option func(*Llama) error
-
-// ModelOption configures model loading parameters
-type ModelOption func(*llamacpp.ModelParams)
-
-// WithGPULayers sets the number of layers to offload to GPU
-func WithGPULayers(layers int) ModelOption {
-	return func(p *llamacpp.ModelParams) {
-		p.NGPULayers = int32(layers)
+	return &schema.GPUInfo{
+		Backend: llamacpp.GPUBackendName(),
+		Devices: devices,
 	}
 }

@@ -1,7 +1,7 @@
 package llamacpp
 
 /*
-#include "chat.h"
+#include "chat_template.h"
 #include "model.h"
 #include <stdlib.h>
 */

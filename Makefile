@@ -59,7 +59,7 @@ wrapper: cmake-dep libllama generate
 	@${CMAKE} --install ${BUILD_DIR}/wrapper --prefix $(shell realpath ${PREFIX})
 
 # Generate the pkg-config files
-generate: mkdir go-tidy libllama wrapper
+generate: mkdir go-tidy libllama
 	@echo "Generating pkg-config"
 	@mkdir -p ${BUILD_DIR}/lib/pkgconfig
 	@rm -f $(shell realpath ${PREFIX})/lib/pkgconfig/llama.pc
@@ -83,12 +83,12 @@ test: test-sys test-pkg
 # Note: -p 1 is required because llama.cpp with Metal uses shared GPU state that isn't thread-safe
 test-sys: wrapper
 	@echo "Running tests (sys)"
-	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig ${GO} test -p 1 ${TEST_FLAGS} ./sys/llamacpp/...
+	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig ${GO} test -p 1 ${TEST_FLAGS} ./sys/...
 
 # Test pkg (higher-level APIs)
 test-pkg:
 	@echo "Running tests (pkg)"
-	@${GO} test ${TEST_FLAGS} ./pkg/llamacpp/...
+	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig ${GO} test ${TEST_FLAGS} ./pkg/llamacpp/...
 
 # Run tests with verbose output
 test-v: wrapper
