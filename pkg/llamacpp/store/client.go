@@ -21,18 +21,17 @@ import (
 // CONSTANTS
 
 const (
-	schemeHF    = "hf"
-	schemeHTTP  = "http"
-	schemeHTTPS = "https"
-
-	hostHuggingFace = "huggingface.co"
-	defaultBranch   = "main"
-	downloadParam   = "download=true"
-
-	errInvalidHFURL    = "invalid hf:// URL: missing user"
-	errInvalidHFFormat = "invalid hf:// URL format: expected hf://user/repo/path/file"
-	errInvalidHFCoURL  = "invalid huggingface.co URL format"
-	errCannotParseRepo = "could not parse repo or file path from URL"
+	schemeHF                = "hf"
+	schemeHTTP              = "http"
+	schemeHTTPS             = "https"
+	hostHuggingFace         = "huggingface.co"
+	defaultBranch           = "main"
+	downloadParam           = "download=true"
+	errInvalidHFURL         = "invalid hf:// URL: missing user"
+	errInvalidHFFormat      = "invalid hf:// URL format: expected hf://user/repo/path/file"
+	errInvalidHFCoURL       = "invalid huggingface.co URL format"
+	errCannotParseRepo      = "could not parse repo or file path from URL"
+	pullProgressMinInterval = 500 * time.Millisecond
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -76,9 +75,6 @@ func NewClient(opts ...client.ClientOpt) (*Client, error) {
 		return &Client{Client: c}, nil
 	}
 }
-
-const pullProgressMinInterval = 500 * time.Millisecond
-
 func NewClientModel(w io.Writer, fn ClientCallback) *ClientModel {
 	return &ClientModel{
 		w:  w,
