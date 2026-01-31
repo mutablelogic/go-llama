@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/alecthomas/kong v1.13.0
+	github.com/chzyer/readline v1.5.1
 	github.com/mutablelogic/go-client v1.3.5
 	github.com/mutablelogic/go-server v1.5.18
 	github.com/stretchr/testify v1.11.1

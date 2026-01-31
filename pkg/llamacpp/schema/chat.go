@@ -18,10 +18,11 @@ type ChatRequest struct {
 
 // ChatResponse contains the generated assistant message.
 type ChatResponse struct {
-	Model        string      `json:"model"`                   // Model used
-	Message      ChatMessage `json:"message"`                 // Assistant message
-	Usage        Usage       `json:"usage"`                   // Token usage
-	FinishReason string      `json:"finish_reason,omitempty"` // Reason generation ended
+	Model        string       `json:"model"`                   // Model used
+	Thinking     *ChatMessage `json:"thinking,omitempty"`      // Optional reasoning message
+	Message      ChatMessage  `json:"message"`                 // Assistant message
+	Usage        Usage        `json:"usage"`                   // Token usage
+	FinishReason string       `json:"finish_reason,omitempty"` // Reason generation ended
 }
 
 // ChatChunk contains a streamed chat chunk.

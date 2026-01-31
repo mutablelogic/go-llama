@@ -5,6 +5,7 @@ package llamacpp
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	// Packages
 	otel "github.com/mutablelogic/go-client/pkg/otel"
@@ -42,14 +43,18 @@ func (l *Llama) Chat(ctx context.Context, req schema.ChatRequest, onChunk func(s
 
 		opts := buildCompletionOptions(ctx, req.CompletionRequest)
 		var callbackErr error
+		var splitter *thinkingStreamSplitter
 		if onChunk != nil {
+			splitter = newThinkingStreamSplitter()
 			opts.OnToken = func(token string) bool {
 				if callbackErr != nil {
 					return false
 				}
-				if err := onChunk(schema.ChatChunk{Message: schema.ChatMessage{Role: "assistant", Content: token}}); err != nil {
-					callbackErr = err
-					return false
+				for _, chunk := range splitter.Process(token) {
+					if err := onChunk(chunk); err != nil {
+						callbackErr = err
+						return false
+					}
 				}
 				return true
 			}
@@ -68,15 +73,30 @@ func (l *Llama) Chat(ctx context.Context, req schema.ChatRequest, onChunk func(s
 			return err
 		}
 		finishReason := completionFinishReason(req.CompletionRequest, text, usage, stopWordHit)
+		parsed := ParseReasoning(text)
+		cleanText := parsed.Content
+		var thinkingMsg *schema.ChatMessage
+		if parsed.HasThinking {
+			thinkingMsg = &schema.ChatMessage{Role: "thinking", Content: parsed.Thinking}
+		}
 
 		result = &schema.ChatResponse{
-			Model: req.Model,
+			Model:    req.Model,
+			Thinking: thinkingMsg,
 			Message: schema.ChatMessage{
 				Role:    "assistant",
-				Content: text,
+				Content: cleanText,
 			},
 			Usage:        usage,
 			FinishReason: finishReason,
+		}
+
+		if onChunk != nil && splitter != nil {
+			for _, chunk := range splitter.Flush() {
+				if err := onChunk(chunk); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	})
@@ -113,4 +133,112 @@ func buildChatPrompt(model *llamacpp.Model, req schema.ChatRequest) (string, err
 	}
 
 	return llamacpp.ApplyTemplateWithModel(model, "", messages, true)
+}
+
+type thinkingStreamSplitter struct {
+	inThinking bool
+	buffer     string
+}
+
+var (
+	thinkingOpenTags  = []string{"<think>", "<reasoning>", "<scratchpad>", "<thought>", "<internal>"}
+	thinkingCloseTags = []string{"</think>", "</reasoning>", "</scratchpad>", "</thought>", "</internal>"}
+	maxThinkingTagLen = maxTagLen(append(thinkingOpenTags, thinkingCloseTags...))
+)
+
+func newThinkingStreamSplitter() *thinkingStreamSplitter {
+	return &thinkingStreamSplitter{}
+}
+
+func (f *thinkingStreamSplitter) Process(chunk string) []schema.ChatChunk {
+	return f.process(chunk, false)
+}
+
+func (f *thinkingStreamSplitter) Flush() []schema.ChatChunk {
+	return f.process("", true)
+}
+
+func (f *thinkingStreamSplitter) process(chunk string, flush bool) []schema.ChatChunk {
+	if chunk == "" && !flush {
+		return nil
+	}
+
+	s := f.buffer + chunk
+	if !flush {
+		limit := len(s) - (maxThinkingTagLen - 1)
+		if limit < 0 {
+			f.buffer = s
+			return nil
+		}
+		f.buffer = s[limit:]
+		s = s[:limit]
+	} else {
+		f.buffer = ""
+	}
+
+	var out []schema.ChatChunk
+	var current strings.Builder
+	currentRole := "assistant"
+	if f.inThinking {
+		currentRole = "thinking"
+	}
+
+	flushCurrent := func() {
+		if current.Len() == 0 {
+			return
+		}
+		out = append(out, schema.ChatChunk{Message: schema.ChatMessage{Role: currentRole, Content: current.String()}})
+		current.Reset()
+	}
+
+	for i := 0; i < len(s); {
+		if f.inThinking {
+			if tagLen := matchTag(s, i, thinkingCloseTags); tagLen > 0 {
+				flushCurrent()
+				f.inThinking = false
+				currentRole = "assistant"
+				i += tagLen
+				continue
+			}
+			current.WriteByte(s[i])
+			i++
+			continue
+		}
+
+		if tagLen := matchTag(s, i, thinkingOpenTags); tagLen > 0 {
+			flushCurrent()
+			f.inThinking = true
+			currentRole = "thinking"
+			i += tagLen
+			continue
+		}
+
+		current.WriteByte(s[i])
+		i++
+	}
+
+	flushCurrent()
+	return out
+}
+
+func matchTag(s string, i int, tags []string) int {
+	for _, tag := range tags {
+		if len(s)-i >= len(tag) && s[i:i+len(tag)] == tag {
+			return len(tag)
+		}
+	}
+	return 0
+}
+
+func maxTagLen(tags []string) int {
+	max := 0
+	for _, tag := range tags {
+		if len(tag) > max {
+			max = len(tag)
+		}
+	}
+	if max < 1 {
+		return 1
+	}
+	return max
 }
