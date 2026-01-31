@@ -67,7 +67,9 @@ func (l *Llama) LoadModel(ctx context.Context, req schema.LoadModelRequest) (res
 	cached := &schema.CachedModel{
 		Model:    *model,
 		LoadedAt: time.Now(),
-		Handle:   handle,
+		ServerModel: schema.ServerModel{
+			Handle: handle,
+		},
 	}
 	if info, err := handle.Info(); err == nil {
 		cached.Runtime = &schema.ModelRuntime{

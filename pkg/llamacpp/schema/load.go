@@ -1,11 +1,7 @@
 package schema
 
 import (
-	"sync"
 	"time"
-
-	// Packages
-	llamacpp "github.com/mutablelogic/go-llama/sys/llamacpp"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -26,14 +22,13 @@ type PullModelRequest struct {
 	URL string `json:"url"` // URL to download the model from (supports hf:// and https://)
 }
 
-// CachedModel represents a model that has been loaded into memory.
-// The embedded RWMutex provides thread-safety for operations on this model.
+// CachedModel represents a model loaded in memory.
+// For server builds, it embeds ServerModel which provides the Handle and RWMutex.
 type CachedModel struct {
-	sync.RWMutex
+	ServerModel
 	Model
-	LoadedAt time.Time       `json:"loaded_at,omitzero"`
-	Runtime  *ModelRuntime   `json:"runtime,omitempty"`
-	Handle   *llamacpp.Model `json:"-"`
+	LoadedAt time.Time     `json:"loaded_at,omitzero"`
+	Runtime  *ModelRuntime `json:"runtime,omitempty"`
 }
 
 // ContextRequest contains parameters for creating an inference context.

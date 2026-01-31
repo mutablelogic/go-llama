@@ -7,7 +7,6 @@ import (
 	// Packages
 	client "github.com/mutablelogic/go-client"
 	schema "github.com/mutablelogic/go-llama/pkg/llamacpp/schema"
-	llamacpp "github.com/mutablelogic/go-llama/sys/llamacpp"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -56,7 +55,7 @@ func (c *Client) Tokenize(ctx context.Context, model, text string, opts ...Opt) 
 // Example:
 //
 //	result, err := client.Detokenize(ctx, "llama-7b", tokens)
-func (c *Client) Detokenize(ctx context.Context, model string, tokens []llamacpp.Token, opts ...Opt) (*schema.DetokenizeResponse, error) {
+func (c *Client) Detokenize(ctx context.Context, model string, tokens []schema.Token, opts ...Opt) (*schema.DetokenizeResponse, error) {
 	if model == "" {
 		return nil, fmt.Errorf("model name cannot be empty")
 	}

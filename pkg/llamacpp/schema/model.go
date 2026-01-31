@@ -42,3 +42,7 @@ type ModelRuntime struct {
 func (m Model) String() string {
 	return stringify(m)
 }
+
+func (m ModelRuntime) String() string {
+	return stringify(m)
+}
