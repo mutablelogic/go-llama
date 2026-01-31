@@ -276,7 +276,9 @@ func TestModelUnload_EmptyID(t *testing.T) {
 	router := http.NewServeMux()
 	RegisterModelHandlers(router, "/api", llama, noopMiddleware())
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/model/", nil)
+	reqBody := `{"load": false}`
+	req := httptest.NewRequest(http.MethodPost, "/api/model/", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
 	rw := httptest.NewRecorder()
 
 	router.ServeHTTP(rw, req)
@@ -286,6 +288,47 @@ func TestModelUnload_EmptyID(t *testing.T) {
 }
 
 func TestModelUnload_NonExistentModel(t *testing.T) {
+	llama := setupTestLlama(t)
+	defer func() {
+		_ = llama.Close()
+	}()
+
+	router := http.NewServeMux()
+	RegisterModelHandlers(router, "/api", llama, noopMiddleware())
+
+	reqBody := `{"load": false}`
+	req := httptest.NewRequest(http.MethodPost, "/api/model/nonexistent", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	rw := httptest.NewRecorder()
+
+	router.ServeHTTP(rw, req)
+
+	// Should return 404 for nonexistent model
+	assert.Equal(t, http.StatusNotFound, rw.Code)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// TESTS - DELETE MODEL
+
+func TestModelDelete_EmptyID(t *testing.T) {
+	llama := setupTestLlama(t)
+	defer func() {
+		_ = llama.Close()
+	}()
+
+	router := http.NewServeMux()
+	RegisterModelHandlers(router, "/api", llama, noopMiddleware())
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/model/", nil)
+	rw := httptest.NewRecorder()
+
+	router.ServeHTTP(rw, req)
+
+	// Should get 400 for empty path
+	assert.Equal(t, http.StatusBadRequest, rw.Code)
+}
+
+func TestModelDelete_NonExistentModel(t *testing.T) {
 	llama := setupTestLlama(t)
 	defer func() {
 		_ = llama.Close()

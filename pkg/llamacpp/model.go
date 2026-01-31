@@ -173,6 +173,34 @@ func (l *Llama) UnloadModel(ctx context.Context, name string) (result *schema.Ca
 	}, nil
 }
 
+// DeleteModel deletes a model from disk and removes it from the cache if loaded.
+func (l *Llama) DeleteModel(ctx context.Context, name string) (err error) {
+	ctx, endSpan := otel.StartSpan(l.tracer, ctx, schema.SpanName("DeleteModel"),
+		attribute.String("request", name),
+	)
+	defer func() { endSpan(err) }()
+
+	l.Lock()
+	defer l.Unlock()
+
+	// Get model from store
+	model, err := l.Store.GetModel(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	// If cached, close and remove from cache
+	if cached, ok := l.cached[model.Path]; ok {
+		if cached.Handle != nil {
+			cached.Handle.Close()
+		}
+		delete(l.cached, model.Path)
+	}
+
+	// Delete from store
+	return l.Store.DeleteModel(ctx, model.Path)
+}
+
 // PullModel downloads a model from the given URL and returns the cached model.
 func (l *Llama) PullModel(ctx context.Context, req schema.PullModelRequest, fn PullCallback) (result *schema.CachedModel, err error) {
 	ctx, endSpan := otel.StartSpan(l.tracer, ctx, schema.SpanName("PullModel"),

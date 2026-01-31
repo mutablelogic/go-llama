@@ -17,6 +17,7 @@ type ModelCommands struct {
 	PullModel   PullModelCommand   `cmd:"" name:"pull" help:"Download a model from URL." group:"MODEL"`
 	LoadModel   LoadModelCommand   `cmd:"" name:"load" help:"Load model into memory." group:"MODEL"`
 	UnloadModel UnloadModelCommand `cmd:"" name:"unload" help:"Unload model from memory." group:"MODEL"`
+	DeleteModel DeleteModelCommand `cmd:"" name:"delete" help:"Delete model from disk." group:"MODEL"`
 }
 
 type ListModelsCommand struct{}
@@ -39,6 +40,10 @@ type LoadModelCommand struct {
 }
 
 type UnloadModelCommand struct {
+	ID string `arg:"" name:"id" help:"Model ID or path"`
+}
+
+type DeleteModelCommand struct {
 	ID string `arg:"" name:"id" help:"Model ID or path"`
 }
 
@@ -175,12 +180,32 @@ func (cmd *UnloadModelCommand) Run(ctx *Globals) (err error) {
 	defer func() { endSpan(err) }()
 
 	// Unload model
-	err = client.UnloadModel(parent, cmd.ID)
+	model, err := client.UnloadModel(parent, cmd.ID)
 	if err != nil {
 		return err
 	}
 
+	// Print result
+	fmt.Println(model)
+	return nil
+}
+
+func (cmd *DeleteModelCommand) Run(ctx *Globals) (err error) {
+	client, err := ctx.Client()
+	if err != nil {
+		return err
+	}
+
+	// OTEL
+	parent, endSpan := otel.StartSpan(ctx.tracer, ctx.ctx, "DeleteModelCommand")
+	defer func() { endSpan(err) }()
+
+	// Delete model
+	if err := client.DeleteModel(parent, cmd.ID); err != nil {
+		return err
+	}
+
 	// Print success message
-	fmt.Printf("Model %s unloaded successfully\n", cmd.ID)
+	fmt.Printf("Model %s deleted successfully\n", cmd.ID)
 	return nil
 }

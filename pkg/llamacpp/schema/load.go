@@ -14,6 +14,7 @@ import (
 // LoadModelRequest contains the parameters for loading a model into memory.
 type LoadModelRequest struct {
 	Name   string `json:"name"`                 // Model name or path to load
+	Load   *bool  `json:"load,omitempty"`       // Load (true) or unload (false) model (nil = load)
 	Gpu    *int32 `json:"gpu,omitempty"`        // Main GPU index (nil = default)
 	Layers *int32 `json:"gpu_layers,omitempty"` // Number of layers to offload to GPU (nil = default, -1 = all)
 	Mmap   *bool  `json:"use_mmap,omitempty"`   // Use memory mapping for model loading (nil = default)

@@ -30,16 +30,16 @@ func RegisterModelHandlers(router *http.ServeMux, prefix string, llamaInstance *
 	}))
 
 	// GET /model/{id} - get a specific model
-	// POST /model/{id} - load a model by id
-	// DELETE /model/{id} - unload a specific model
+	// POST /model/{id} - load/unload a model by id
+	// DELETE /model/{id} - delete a specific model from disk
 	router.HandleFunc(joinPath(prefix, "model/{id...}"), middleware.Wrap(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			_ = modelGet(w, r, llamaInstance)
 		case http.MethodPost:
-			_ = modelLoad(w, r, llamaInstance)
+			_ = modelLoadUnload(w, r, llamaInstance)
 		case http.MethodDelete:
-			_ = modelUnload(w, r, llamaInstance)
+			_ = modelDelete(w, r, llamaInstance)
 		default:
 			_ = httpresponse.Error(w, httpresponse.Err(http.StatusMethodNotAllowed), r.Method)
 		}
@@ -138,42 +138,40 @@ func modelPull(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.L
 	return httpresponse.JSON(w, http.StatusCreated, httprequest.Indent(r), model)
 }
 
-// modelLoad handles POST /model/{id} requests to load a specific model by id
-func modelLoad(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
-	id := r.PathValue("id")
-	if id == "" {
-		return httpresponse.Error(w, httpresponse.ErrBadRequest.With("model id is required"))
-	}
+// modelLoadUnload handles POST /model/{id} requests to load or unload a specific model by id
+func modelLoadUnload(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
+	var req schema.LoadModelRequest
 
-	// Create LoadModelRequest with the id from URL path
-	req := schema.LoadModelRequest{
-		Name: id,
-	}
-
-	// Read any additional options from request body (optional)
+	// Read any load/unload options from request body (optional)
 	if r.ContentLength > 0 {
 		if err := httprequest.Read(r, &req); err != nil {
 			return httpresponse.Error(w, httpresponse.ErrBadRequest.With(err.Error()))
 		}
-		// Ensure the id from URL takes precedence
-		req.Name = id
 	}
 
-	model, err := llamaInstance.LoadModel(r.Context(), req)
-	if err != nil {
+	// Ensure the id from URL takes precedence
+	req.Name = r.PathValue("id")
+	if req.Load != nil && !*req.Load {
+		if model, err := llamaInstance.UnloadModel(r.Context(), req.Name); err != nil {
+			return httpresponse.Error(w, httperr(err))
+		} else {
+			return httpresponse.JSON(w, http.StatusOK, httprequest.Indent(r), model)
+		}
+	} else if model, err := llamaInstance.LoadModel(r.Context(), req); err != nil {
 		return httpresponse.Error(w, httperr(err))
+	} else {
+		return httpresponse.JSON(w, http.StatusOK, httprequest.Indent(r), model)
 	}
-	return httpresponse.JSON(w, http.StatusOK, httprequest.Indent(r), model)
 }
 
-// modelUnload handles DELETE /model/{id} requests to unload a specific model
-func modelUnload(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
+// modelDelete handles DELETE /model/{id} requests to delete a specific model from disk
+func modelDelete(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
 	id := r.PathValue("id")
 	if id == "" {
 		return httpresponse.Error(w, httpresponse.ErrBadRequest.With("model id is required"))
 	}
 
-	if _, err := llamaInstance.UnloadModel(r.Context(), id); err != nil {
+	if err := llamaInstance.DeleteModel(r.Context(), id); err != nil {
 		return httpresponse.Error(w, httperr(err))
 	}
 	return httpresponse.JSON(w, http.StatusNoContent, httprequest.Indent(r), nil)

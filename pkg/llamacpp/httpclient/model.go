@@ -159,8 +159,29 @@ func (c *Client) PullModel(ctx context.Context, url string, opts ...Opt) (*schem
 	return &response, nil
 }
 
-// UnloadModel unloads a model from memory.
-func (c *Client) UnloadModel(ctx context.Context, id string) error {
+// UnloadModel unloads a model from memory and returns the unloaded model.
+func (c *Client) UnloadModel(ctx context.Context, id string) (*schema.CachedModel, error) {
+	if id == "" {
+		return nil, fmt.Errorf("model id cannot be empty")
+	}
+
+	reqBody := map[string]any{"load": false}
+	req, err := client.NewJSONRequest(reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	// Perform request - expect model response
+	var response schema.CachedModel
+	if err := c.DoWithContext(ctx, req, &response, client.OptPath("model", id)); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+// DeleteModel deletes a model from disk.
+func (c *Client) DeleteModel(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("model id cannot be empty")
 	}

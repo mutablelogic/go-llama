@@ -1,11 +1,11 @@
 //go:build vulkan
 
-package whisper
+package llamacpp
 
 ///////////////////////////////////////////////////////////////////////////////
 // CGO
 
 /*
-#cgo pkg-config: libwhisper-vulkan vulkan
+#cgo pkg-config: libllama-vulkan vulkan
 */
 import "C"

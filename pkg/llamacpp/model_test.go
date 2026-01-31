@@ -234,6 +234,23 @@ func TestLlamaUnloadModel(t *testing.T) {
 	assert.Nil(model.Handle)
 }
 
+func TestLlamaDeleteModel(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	path, err := filepath.Abs(testdataPath)
+	require.NoError(err)
+
+	l, err := llamacpp.New(path)
+	require.NoError(err)
+	defer l.Close()
+
+	// Delete non-existent model should return ErrNotFound
+	err = l.DeleteModel(context.Background(), "nonexistent.gguf")
+	require.Error(err)
+	assert.True(errors.Is(err, llama.ErrNotFound))
+}
+
 func TestLlamaUnloadModelNotLoaded(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
