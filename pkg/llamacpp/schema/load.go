@@ -32,6 +32,7 @@ type CachedModel struct {
 	sync.RWMutex
 	Model
 	LoadedAt time.Time       `json:"loaded_at,omitzero"`
+	Runtime  *ModelRuntime   `json:"runtime,omitempty"`
 	Handle   *llamacpp.Model `json:"-"`
 }
 

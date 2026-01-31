@@ -30,6 +30,17 @@ type Model struct {
 	Meta map[string]any `json:"meta,omitempty"`
 }
 
+// ModelRuntime represents runtime statistics for a loaded model.
+type ModelRuntime struct {
+	NLayer    int32  `json:"layerCount,omitempty"`
+	NHead     int32  `json:"headCount,omitempty"`
+	NHeadKV   int32  `json:"headKVCount,omitempty"`
+	NEmbd     int32  `json:"embeddingSize,omitempty"`
+	NCtxTrain int32  `json:"contextSize,omitempty"`
+	NParams   uint64 `json:"paramCount,omitempty"`
+	ModelSize uint64 `json:"modelSizeBytes,omitempty"`
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // CONSTRUCTORS
 

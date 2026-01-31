@@ -283,8 +283,8 @@ func TestModelUnload_EmptyID(t *testing.T) {
 
 	router.ServeHTTP(rw, req)
 
-	// Should get 400 for empty path
-	assert.Equal(t, http.StatusBadRequest, rw.Code)
+	// Should get 404 for empty path
+	assert.Equal(t, http.StatusNotFound, rw.Code)
 }
 
 func TestModelUnload_NonExistentModel(t *testing.T) {

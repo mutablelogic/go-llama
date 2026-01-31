@@ -69,6 +69,17 @@ func (l *Llama) LoadModel(ctx context.Context, req schema.LoadModelRequest) (res
 		LoadedAt: time.Now(),
 		Handle:   handle,
 	}
+	if info, err := handle.Info(); err == nil {
+		cached.Runtime = &schema.ModelRuntime{
+			NLayer:    info.NLayer,
+			NHead:     info.NHead,
+			NHeadKV:   info.NHeadKV,
+			NEmbd:     info.NEmbd,
+			NCtxTrain: info.NCtxTrain,
+			NParams:   info.NParams,
+			ModelSize: info.ModelSize,
+		}
+	}
 	l.cached[model.Path] = cached
 	return cached, nil
 }
@@ -93,6 +104,7 @@ func (l *Llama) ListModels(ctx context.Context) (result []*schema.CachedModel, e
 	result = make([]*schema.CachedModel, 0, len(models))
 	for _, m := range models {
 		if cached, ok := l.cached[m.Path]; ok {
+			l.populateRuntime(cached)
 			result = append(result, cached)
 		} else {
 			result = append(result, &schema.CachedModel{
@@ -124,6 +136,7 @@ func (l *Llama) GetModel(ctx context.Context, name string) (result *schema.Cache
 
 	// Return cached version if available
 	if cached, ok := l.cached[model.Path]; ok {
+		l.populateRuntime(cached)
 		return cached, nil
 	}
 
@@ -131,6 +144,24 @@ func (l *Llama) GetModel(ctx context.Context, name string) (result *schema.Cache
 	return &schema.CachedModel{
 		Model: *model,
 	}, nil
+}
+
+// populateRuntime fills runtime stats for a loaded model if missing.
+func (l *Llama) populateRuntime(cached *schema.CachedModel) {
+	if cached == nil || cached.Handle == nil || cached.Runtime != nil {
+		return
+	}
+	if info, err := cached.Handle.Info(); err == nil {
+		cached.Runtime = &schema.ModelRuntime{
+			NLayer:    info.NLayer,
+			NHead:     info.NHead,
+			NHeadKV:   info.NHeadKV,
+			NEmbd:     info.NEmbd,
+			NCtxTrain: info.NCtxTrain,
+			NParams:   info.NParams,
+			ModelSize: info.ModelSize,
+		}
+	}
 }
 
 // UnloadModel unloads a model from memory and removes it from the cache.

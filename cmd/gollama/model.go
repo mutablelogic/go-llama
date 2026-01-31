@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	// Packages
 	otel "github.com/mutablelogic/go-client/pkg/otel"
@@ -67,10 +70,72 @@ func (cmd *ListModelsCommand) Run(ctx *Globals) (err error) {
 	}
 
 	// Print
-	for _, model := range models {
-		fmt.Println(model)
+	if ctx.Debug {
+		if b, err := json.MarshalIndent(models, "", "  "); err == nil {
+			fmt.Fprintln(os.Stderr, string(b))
+		}
+		return nil
 	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "PATH\tNAME\tLOADED\tPARAMS\tSIZE\tCTX_TRAIN")
+	for _, model := range models {
+		loaded := "no"
+		params := "-"
+		size := "-"
+		ctxTrain := "-"
+		if !model.LoadedAt.IsZero() {
+			loaded = "yes"
+			if model.Runtime != nil {
+				if model.Runtime.NParams > 0 {
+					params = formatParams(model.Runtime.NParams)
+				}
+				if model.Runtime.ModelSize > 0 {
+					size = formatBytes(model.Runtime.ModelSize)
+				}
+				if model.Runtime.NCtxTrain > 0 {
+					ctxTrain = fmt.Sprintf("%d", model.Runtime.NCtxTrain)
+				}
+			}
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", model.Path, model.Name, loaded, params, size, ctxTrain)
+	}
+	_ = w.Flush()
 	return nil
+}
+
+func formatBytes(bytes uint64) string {
+	if bytes == 0 {
+		return "0B"
+	}
+	units := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB"}
+	size := float64(bytes)
+	unit := 0
+	for size >= 1024.0 && unit < len(units)-1 {
+		size /= 1024.0
+		unit++
+	}
+	if size >= 10.0 || unit == 0 {
+		return fmt.Sprintf("%.0f%s", size, units[unit])
+	}
+	return fmt.Sprintf("%.1f%s", size, units[unit])
+}
+
+func formatParams(params uint64) string {
+	if params == 0 {
+		return "0"
+	}
+	units := []string{"", "K", "M", "B", "T"}
+	value := float64(params)
+	unit := 0
+	for value >= 1000.0 && unit < len(units)-1 {
+		value /= 1000.0
+		unit++
+	}
+	if value >= 10.0 || unit == 0 {
+		return fmt.Sprintf("%.0f%s", value, units[unit])
+	}
+	return fmt.Sprintf("%.1f%s", value, units[unit])
 }
 
 func (cmd *PullModelCommand) Run(ctx *Globals) (err error) {
