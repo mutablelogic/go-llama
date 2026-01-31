@@ -30,9 +30,9 @@ func RegisterModelHandlers(router *http.ServeMux, prefix string, llamaInstance *
 	}))
 
 	// GET /model/{id} - get a specific model
-	// POST /model/{name} - load a model by name
+	// POST /model/{id} - load a model by id
 	// DELETE /model/{id} - unload a specific model
-	router.HandleFunc(joinPath(prefix, "model/{id}"), middleware.Wrap(func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc(joinPath(prefix, "model/{id...}"), middleware.Wrap(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			_ = modelGet(w, r, llamaInstance)
@@ -102,7 +102,7 @@ func modelPull(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.L
 	// Stream progress updates using TextStream
 	var progressCallback llamacpp.PullCallback
 	if stream != nil {
-		progressCallback = func(filename string, bytesReceived, totalBytes uint64) {
+		progressCallback = func(filename string, bytesReceived, totalBytes uint64) error {
 			var percentage float64
 			if totalBytes > 0 {
 				percentage = float64(bytesReceived) * 100.0 / float64(totalBytes)
@@ -113,6 +113,7 @@ func modelPull(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.L
 				TotalBytes:    totalBytes,
 				Percentage:    percentage,
 			})
+			return nil
 		}
 	}
 
@@ -137,16 +138,16 @@ func modelPull(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.L
 	return httpresponse.JSON(w, http.StatusCreated, httprequest.Indent(r), model)
 }
 
-// modelLoad handles POST /model/{name} requests to load a specific model by name
+// modelLoad handles POST /model/{id} requests to load a specific model by id
 func modelLoad(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
-	name := r.PathValue("id") // Using "id" path parameter for the model name
-	if name == "" {
-		return httpresponse.Error(w, httpresponse.ErrBadRequest.With("model name is required"))
+	id := r.PathValue("id")
+	if id == "" {
+		return httpresponse.Error(w, httpresponse.ErrBadRequest.With("model id is required"))
 	}
 
-	// Create LoadModelRequest with the name from URL path
+	// Create LoadModelRequest with the id from URL path
 	req := schema.LoadModelRequest{
-		Name: name,
+		Name: id,
 	}
 
 	// Read any additional options from request body (optional)
@@ -154,8 +155,8 @@ func modelLoad(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.L
 		if err := httprequest.Read(r, &req); err != nil {
 			return httpresponse.Error(w, httpresponse.ErrBadRequest.With(err.Error()))
 		}
-		// Ensure the name from URL takes precedence
-		req.Name = name
+		// Ensure the id from URL takes precedence
+		req.Name = id
 	}
 
 	model, err := llamaInstance.LoadModel(r.Context(), req)

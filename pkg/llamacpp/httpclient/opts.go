@@ -18,13 +18,15 @@ type opt struct {
 	Mlock  *bool
 
 	// Completion options
-	MaxTokens   *int32
-	Temperature *float32
-	TopP        *float32
-	TopK        *int32
-	Seed        *uint32
-	Stop        []string
-	PrefixCache *bool
+	MaxTokens     *int32
+	Temperature   *float32
+	TopP          *float32
+	TopK          *int32
+	RepeatPenalty *float32
+	RepeatLastN   *int32
+	Seed          *uint32
+	Stop          []string
+	PrefixCache   *bool
 
 	// Embedding options
 	Normalize *bool
@@ -137,6 +139,28 @@ func WithTopK(topK int32) Opt {
 			return fmt.Errorf("top_k must be at least 1")
 		}
 		o.TopK = &topK
+		return nil
+	}
+}
+
+// WithRepeatPenalty sets the repeat penalty (1.0 = disabled).
+func WithRepeatPenalty(repeatPenalty float32) Opt {
+	return func(o *opt) error {
+		if repeatPenalty < 0 {
+			return fmt.Errorf("repeat_penalty must be >= 0")
+		}
+		o.RepeatPenalty = &repeatPenalty
+		return nil
+	}
+}
+
+// WithRepeatLastN sets the repeat penalty window size.
+func WithRepeatLastN(repeatLastN int32) Opt {
+	return func(o *opt) error {
+		if repeatLastN < 0 {
+			return fmt.Errorf("repeat_last_n must be >= 0")
+		}
+		o.RepeatLastN = &repeatLastN
 		return nil
 	}
 }

@@ -72,7 +72,8 @@ func httperr(err error) error {
 		errors.Is(err, llama.ErrInvalidToken),
 		errors.Is(err, llama.ErrInvalidBatch),
 		errors.Is(err, llama.ErrBatchFull),
-		errors.Is(err, llama.ErrNoKVSlot):
+		errors.Is(err, llama.ErrNoKVSlot),
+		errors.Is(err, llama.ErrNotEmbeddingModel):
 		return httpresponse.ErrBadRequest.With(err.Error())
 	default:
 		return httpresponse.ErrInternalError.With(err.Error())

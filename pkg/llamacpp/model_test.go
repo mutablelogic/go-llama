@@ -27,11 +27,12 @@ func TestLlamaListModels(t *testing.T) {
 
 	models, err := l.ListModels(context.Background())
 	require.NoError(err)
-	assert.Len(models, 2)
+	assert.Len(models, 3)
 
 	// Check models are sorted by path
-	assert.Equal("all-MiniLM-L6-v2-Q4_K_M.gguf", models[0].Path)
-	assert.Equal("stories260K.gguf", models[1].Path)
+	assert.Equal("Qwen3-8B-Q8_0.gguf", models[0].Path)
+	assert.Equal("all-MiniLM-L6-v2-Q4_K_M.gguf", models[1].Path)
+	assert.Equal("stories260K.gguf", models[2].Path)
 
 	// Check uncached models have zero timestamp and nil handle
 	for _, m := range models {
@@ -188,7 +189,7 @@ func TestLlamaListModelsAfterLoad(t *testing.T) {
 	// List all models
 	models, err := l.ListModels(context.Background())
 	require.NoError(err)
-	assert.Len(models, 2)
+	assert.Len(models, 3)
 
 	// Check one is loaded, one is not
 	for _, m := range models {

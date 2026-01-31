@@ -17,7 +17,7 @@ import (
 // PUBLIC METHODS
 
 // PullCallback defines the callback function signature for progress updates during model downloads
-type PullCallback func(filename string, bytes_received uint64, total_bytes uint64)
+type PullCallback func(filename string, bytes_received uint64, total_bytes uint64) error
 
 // LoadModel loads a model into memory with the given parameters.
 // Returns a CachedModel with the model handle and load timestamp.

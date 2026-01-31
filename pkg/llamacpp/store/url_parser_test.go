@@ -126,7 +126,7 @@ func TestBuildHuggingFaceURL(t *testing.T) {
 			assert.NotNil(t, gotURL)
 			assert.Equal(t, tt.wantURL, gotURL.String())
 			assert.Equal(t, tt.wantDestPath, gotDestPath)
-			assert.Empty(t, gotOpts) // Should return empty options
+			assert.NotEmpty(t, gotOpts)
 		})
 	}
 }
@@ -208,7 +208,7 @@ func TestParseHFScheme(t *testing.T) {
 			assert.NotNil(t, gotURL)
 			assert.Equal(t, tt.wantURL, gotURL.String())
 			assert.Equal(t, tt.wantDestPath, gotDestPath)
-			assert.Empty(t, gotOpts)
+			assert.NotEmpty(t, gotOpts)
 		})
 	}
 }
@@ -259,7 +259,7 @@ func TestParseHTTPScheme(t *testing.T) {
 		},
 		{
 			name:         "invalid HuggingFace URL format",
-			urlStr:       "https://huggingface.co/microsoft/DialoGPT-medium/blob/main/README.md",
+			urlStr:       "https://huggingface.co/microsoft/DialoGPT-medium/raw/main/README.md",
 			wantURL:      "",
 			wantDestPath: "",
 			wantErr:      true,
@@ -296,7 +296,7 @@ func TestParseHTTPScheme(t *testing.T) {
 			assert.NotNil(t, gotURL)
 			assert.Equal(t, tt.wantURL, gotURL.String())
 			assert.Equal(t, tt.wantDestPath, gotDestPath)
-			assert.Empty(t, gotOpts)
+			assert.NotEmpty(t, gotOpts)
 		})
 	}
 }
@@ -341,7 +341,7 @@ func TestParseModelUrl(t *testing.T) {
 			wantURL:      "",
 			wantDestPath: "",
 			wantErr:      true,
-			errContains:  "unsupported URL scheme: ftp",
+			errContains:  "unsupported URL scheme: \"ftp\"",
 		},
 		{
 			name:         "invalid URL",
@@ -371,7 +371,7 @@ func TestParseModelUrl(t *testing.T) {
 			assert.NotNil(t, gotURL)
 			assert.Equal(t, tt.wantURL, gotURL.String())
 			assert.Equal(t, tt.wantDestPath, gotDestPath)
-			assert.Empty(t, gotOpts)
+			assert.NotEmpty(t, gotOpts)
 		})
 	}
 }

@@ -2,6 +2,7 @@ package httpclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -136,7 +137,15 @@ func (c *Client) PullModel(ctx context.Context, url string, opts ...Opt) (*schem
 					return fmt.Errorf("failed to parse model pull response: %w", err)
 				}
 			case schema.ModelPullErrorType:
-				return fmt.Errorf("model pull error: %s", evt.Data)
+				// Parse error JSON to extract clean error message
+				var errResp struct {
+					Error string `json:"error"`
+				}
+				if err := json.Unmarshal([]byte(evt.Data), &errResp); err == nil && errResp.Error != "" {
+					return fmt.Errorf("%s", errResp.Error)
+				}
+				// Fall back to raw data if JSON parsing fails
+				return fmt.Errorf("%s", evt.Data)
 			}
 			return nil
 		}))

@@ -29,11 +29,12 @@ func TestLlama_PullModel(t *testing.T) {
 	defer cancel()
 
 	var progressUpdates int
-	progressCallback := func(filename string, bytesReceived, totalBytes uint64) {
+	progressCallback := func(filename string, bytesReceived, totalBytes uint64) error {
 		progressUpdates++
 		t.Logf("Progress: %s - %d/%d bytes (%.1f%%)",
 			filename, bytesReceived, totalBytes,
 			float64(bytesReceived)*100.0/float64(totalBytes))
+		return nil
 	}
 
 	model, err := llama.PullModel(ctx, schema.PullModelRequest{
@@ -44,6 +45,6 @@ func TestLlama_PullModel(t *testing.T) {
 	assert.NotEmpty(model.Path, "Model should have a path")
 	assert.NotEmpty(model.Name, "Model should have a name")
 	assert.Equal("llama", model.Architecture, "Model architecture should be llama")
-	assert.NotZero(model.LoadedAt, "Model should have a loaded timestamp")
+	assert.True(model.LoadedAt.IsZero(), "Model should not be loaded into memory")
 	assert.Greater(progressUpdates, 0, "Progress callback should be called at least once")
 }

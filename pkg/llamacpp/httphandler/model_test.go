@@ -86,14 +86,14 @@ func TestModelGet_EmptyID(t *testing.T) {
 	router := http.NewServeMux()
 	RegisterModelHandlers(router, "/api", llama, noopMiddleware())
 
-	// Try to get a model with empty ID - should get 404
+	// Try to get a model with empty ID - should get 400
 	req := httptest.NewRequest(http.MethodGet, "/api/model/", nil)
 	rw := httptest.NewRecorder()
 
 	router.ServeHTTP(rw, req)
 
-	// Should get 404 for empty ID path
-	assert.Equal(t, http.StatusNotFound, rw.Code)
+	// Should get 400 for empty ID path
+	assert.Equal(t, http.StatusBadRequest, rw.Code)
 }
 
 func TestModelGet_NonExistent(t *testing.T) {
@@ -281,8 +281,8 @@ func TestModelUnload_EmptyID(t *testing.T) {
 
 	router.ServeHTTP(rw, req)
 
-	// Should get 404 for empty path
-	assert.Equal(t, http.StatusNotFound, rw.Code)
+	// Should get 400 for empty path
+	assert.Equal(t, http.StatusBadRequest, rw.Code)
 }
 
 func TestModelUnload_NonExistentModel(t *testing.T) {

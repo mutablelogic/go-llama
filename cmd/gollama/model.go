@@ -95,7 +95,7 @@ func (cmd *PullModelCommand) Run(ctx *Globals) (err error) {
 	// Pull model
 	model, err := client.PullModel(parent, cmd.URL, opts...)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to pull model from %q: %w", cmd.URL, err)
 	}
 
 	// Clear progress line and print result

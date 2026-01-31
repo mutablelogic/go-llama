@@ -30,7 +30,7 @@ type PullModelRequest struct {
 type CachedModel struct {
 	sync.RWMutex
 	Model
-	LoadedAt time.Time       `json:"loaded_at"`
+	LoadedAt time.Time       `json:"loaded_at,omitzero"`
 	Handle   *llamacpp.Model `json:"-"`
 }
 

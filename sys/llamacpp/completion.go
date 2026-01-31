@@ -45,7 +45,7 @@ type CompletionOptions struct {
 // DefaultCompletionOptions returns sensible defaults
 func DefaultCompletionOptions() CompletionOptions {
 	return CompletionOptions{
-		MaxTokens:           128,
+		MaxTokens:           2048,
 		StopWords:           nil,
 		OnToken:             nil,
 		SamplerParams:       DefaultSamplerParams(),
@@ -223,7 +223,92 @@ func (ctx *Context) CompleteNative(prompt string, opts CompletionOptions) (strin
 	}
 	defer C.llama_go_completion_free_result(cResult)
 
-	return C.GoString(cResult), nil
+	return C.GoString(cResult.text), nil
+}
+
+// CompleteNativeWithStopInfo generates text completion and returns whether a stop sequence was hit
+func (ctx *Context) CompleteNativeWithStopInfo(prompt string, opts CompletionOptions) (string, bool, error) {
+	if ctx.handle == nil {
+		return "", false, ErrInvalidContext
+	}
+
+	if ctx.model == nil || ctx.model.handle == nil {
+		return "", false, ErrInvalidModel
+	}
+
+	// Set up default options
+	if opts.MaxTokens <= 0 {
+		opts.MaxTokens = DefaultCompletionOptions().MaxTokens
+	}
+
+	// Register callback if provided
+	var callbackHandle uintptr
+	if opts.OnToken != nil {
+		callbackHandle = registerCallback(opts.OnToken)
+		defer unregisterCallback(callbackHandle)
+	}
+
+	// Register abort callback if provided
+	var abortHandle uintptr
+	if opts.AbortContext != nil {
+		abortHandle = registerAbortContext(opts.AbortContext)
+		cCtx := (*C.struct_llama_context)(ctx.handle)
+		C.llama_set_abort_callback(cCtx, (C.ggml_abort_callback)(C.goAbortCallback), unsafe.Pointer(abortHandle))
+		defer func() {
+			C.llama_set_abort_callback(cCtx, nil, nil)
+			unregisterAbortContext(abortHandle)
+		}()
+	}
+
+	// Convert SamplerParams to C struct
+	cParams := C.llama_go_completion_default_params()
+	cParams.seed = C.uint32_t(opts.SamplerParams.Seed)
+	cParams.temperature = C.float(opts.SamplerParams.Temperature)
+	cParams.top_k = C.int32_t(opts.SamplerParams.TopK)
+	cParams.top_p = C.float(opts.SamplerParams.TopP)
+	cParams.min_p = C.float(opts.SamplerParams.MinP)
+	cParams.repeat_penalty = C.float(opts.SamplerParams.RepeatPenalty)
+	cParams.repeat_last_n = C.int32_t(opts.SamplerParams.RepeatLastN)
+	cParams.frequency_penalty = C.float(opts.SamplerParams.FrequencyPenalty)
+	cParams.presence_penalty = C.float(opts.SamplerParams.PresencePenalty)
+	cParams.max_tokens = C.int32_t(opts.MaxTokens)
+	cParams.enable_prefix_caching = C.bool(opts.EnablePrefixCaching)
+
+	// Convert stop words to C array
+	var cStopWords **C.char
+	if len(opts.StopWords) > 0 {
+		cStopWords = (**C.char)(C.malloc(C.size_t(len(opts.StopWords)+1) * C.size_t(unsafe.Sizeof(uintptr(0)))))
+		defer C.free(unsafe.Pointer(cStopWords))
+
+		stopWordsSlice := (*[1 << 30]*C.char)(unsafe.Pointer(cStopWords))[: len(opts.StopWords)+1 : len(opts.StopWords)+1]
+		for i, word := range opts.StopWords {
+			stopWordsSlice[i] = C.CString(word)
+			defer C.free(unsafe.Pointer(stopWordsSlice[i]))
+		}
+		stopWordsSlice[len(opts.StopWords)] = nil
+		cParams.stop_words = cStopWords
+		cParams.stop_words_count = C.int32_t(len(opts.StopWords))
+	}
+
+	// Set callback handle if provided
+	if callbackHandle != 0 {
+		cParams.callback_handle = unsafe.Pointer(callbackHandle)
+	}
+
+	// Convert prompt to C string
+	cPrompt := C.CString(prompt)
+	defer C.free(unsafe.Pointer(cPrompt))
+
+	// Call C++ generation function
+	cResult := C.llama_go_completion_generate(ctx.handle, ctx.model.handle, cPrompt, &cParams)
+	if cResult == nil {
+		return "", false, getLastError()
+	}
+	defer C.llama_go_completion_free_result(cResult)
+
+	text := C.GoString(cResult.text)
+	stopWordHit := bool(cResult.stop_word_hit)
+	return text, stopWordHit, nil
 }
 
 // Complete generates text completion for the given prompt

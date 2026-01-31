@@ -33,10 +33,11 @@ func TestClient_PullModel(t *testing.T) {
 	// Track progress through callback
 	var lastFilename string
 	var lastReceived, lastTotal uint64
-	callback := func(filename string, received, total uint64) {
+	callback := func(filename string, received, total uint64) error {
 		lastFilename = filename
 		lastReceived = received
 		lastTotal = total
+		return nil
 	}
 
 	destPath, err := client.PullModel(ctx, &buf, modelURL, callback)
