@@ -6,8 +6,10 @@ import (
 	// Packages
 	otel "github.com/mutablelogic/go-client/pkg/otel"
 	httpclient "github.com/mutablelogic/go-llama/pkg/llamacpp/httpclient"
-	llamacpp "github.com/mutablelogic/go-llama/sys/llamacpp"
 )
+
+// Token is a token ID (alias for int32 to match llamacpp.Token)
+type Token = int32
 
 ///////////////////////////////////////////////////////////////////////////////
 // TYPES
@@ -25,10 +27,10 @@ type TokenizeCommand struct {
 }
 
 type DetokenizeCommand struct {
-	Model          string           `arg:"" name:"model" help:"Model name or path"`
-	Tokens         []llamacpp.Token `arg:"" name:"tokens" help:"Tokens to detokenize"`
-	RemoveSpecial  *bool            `name:"remove-special" help:"Remove BOS/EOS tokens"`
-	UnparseSpecial *bool            `name:"unparse-special" help:"Render special tokens as text"`
+	Model          string  `arg:"" name:"model" help:"Model name or path"`
+	Tokens         []Token `arg:"" name:"tokens" help:"Tokens to detokenize"`
+	RemoveSpecial  *bool   `name:"remove-special" help:"Remove BOS/EOS tokens"`
+	UnparseSpecial *bool   `name:"unparse-special" help:"Render special tokens as text"`
 }
 
 ///////////////////////////////////////////////////////////////////////////////

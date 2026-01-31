@@ -25,7 +25,8 @@ import (
 // TYPES
 
 type ServerCommands struct {
-	RunServer RunServer `cmd:"" name:"run" help:"Run server." group:"SERVER"`
+	GpuInfo   GpuInfoCmd `cmd:"" name:"gpuinfo" help:"Show GPU information"`
+	RunServer RunServer  `cmd:"" name:"run" help:"Run server." group:"SERVER"`
 }
 
 type RunServer struct {
