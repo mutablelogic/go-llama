@@ -48,9 +48,10 @@ func (cmd *ChatCommand) Run(ctx *Globals) (err error) {
 	parent, endSpan := otel.StartSpan(ctx.tracer, ctx.ctx, "ChatCommand")
 	defer func() { endSpan(err) }()
 
-	// Get system prompt from argument or stdin
+	// Get system prompt from argument or stdin (only if stdin isn't used for messages)
+	stdinHasData := stdinHasData()
 	system := cmd.System
-	if system == "" {
+	if system == "" && !stdinHasData {
 		system, err = readStdin()
 		if err != nil {
 			return err
@@ -214,4 +215,13 @@ func readChatMessages() ([]schema.ChatMessage, error) {
 	}
 
 	return messages, nil
+}
+
+// stdinHasData returns true if stdin is piped or redirected.
+func stdinHasData() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (info.Mode() & os.ModeCharDevice) == 0
 }
