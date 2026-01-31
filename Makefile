@@ -15,6 +15,13 @@ BUILD_JOBS ?= -j
 PREFIX ?= ${BUILD_DIR}/install
 CMAKE_FLAGS = -DBUILD_SHARED_LIBS=OFF
 
+# Default docker file is non-cuda
+DOCKER_FILE := etc/Dockerfile.debian
+DOCKER_SUFFIX := ""
+DOCKER_REGISTRY ?= ghcr.io/mutablelogic
+DOCKER_PUSH ?= 0
+DOCKER_BUILD_FLAGS :=
+
 # Build flags
 BUILD_MODULE := $(shell cat go.mod | head -1 | cut -d ' ' -f 2)
 BUILD_LD_FLAGS := -X $(BUILD_MODULE)/pkg/version.GitSource=${BUILD_MODULE}
@@ -31,6 +38,8 @@ ifeq ($(GGML_CUDA),1)
 	CMAKE_FLAGS += -DGGML_CUDA=ON
 	BUILD_FLAGS += -tags cuda
 	BUILD_JOBS = -j2
+	DOCKER_FILE = etc/Dockerfile.cuda
+	DOCKER_SUFFIX = -cuda
 	ifeq ($(ARCH),arm64)
 		CMAKE_FLAGS += '-DCMAKE_CUDA_ARCHITECTURES=87'
 	endif
@@ -43,11 +52,20 @@ endif
 ifeq ($(GGML_VULKAN),1)
 	CMAKE_FLAGS += -DGGML_VULKAN=ON
 	BUILD_FLAGS += -tags vulkan
+	DOCKER_FILE = etc/Dockerfile.vulkan
+	DOCKER_SUFFIX = -vulkan
 endif
 
 # If GGML_NATIVE is set to OFF, disable native CPU optimizations (for portable builds)
 ifeq ($(GGML_NATIVE),OFF)
 	CMAKE_FLAGS += -DGGML_NATIVE=OFF
+endif
+
+# Docker
+DOCKER_TAG := ${DOCKER_REGISTRY}/go-llama${DOCKER_SUFFIX}-${OS}-${ARCH}:${VERSION}
+
+ifeq ($(DOCKER_PUSH),1)
+	DOCKER_BUILD_FLAGS += --push
 endif
 
 #####################################################################
@@ -57,6 +75,11 @@ endif
 gollama: wrapper
 	@echo "Building gollama"
 	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig CGO_LDFLAGS_ALLOW="-(W|D).*" ${GO} build ${BUILD_FLAGS} -o ${BUILD_DIR}/gollama ./cmd/gollama
+
+# Make gollama-client (no server run command)
+gollama-client:
+	@echo "Building gollama-client"
+	@${GO} build ${BUILD_FLAGS} -tags client -o ${BUILD_DIR}/gollama ./cmd/gollama
 
 #####################################################################
 # BUILD STATIC LIBRARIES
@@ -83,6 +106,30 @@ generate: mkdir go-tidy libllama
 	@mkdir -p ${BUILD_DIR}/lib/pkgconfig
 	@rm -f $(shell realpath ${PREFIX})/lib/pkgconfig/llama.pc
 	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig PREFIX="$(shell realpath ${PREFIX})" go generate ./sys/llamacpp
+
+
+#####################################################################
+# DOCKER
+
+# Build docker container
+docker: docker-dep submodule
+	@echo build docker image: ${DOCKER_TAG} for ${OS}/${ARCH}
+	@${DOCKER} build \
+		${DOCKER_BUILD_FLAGS} \
+		--tag ${DOCKER_TAG} \
+		--build-arg ARCH=${ARCH} \
+		--build-arg OS=${OS} \
+		--build-arg BUILD_JOBS=${BUILD_JOBS} \
+		--build-arg SOURCE=${BUILD_MODULE} \
+		--build-arg VERSION=${VERSION} \
+		--build-arg GGML_CUDA=${GGML_CUDA} \
+		--build-arg GGML_VULKAN=${GGML_VULKAN} \
+		-f ${DOCKER_FILE} .
+
+# Push docker container
+docker-push: docker-dep 
+	@echo push docker image: ${DOCKER_TAG}
+	@${DOCKER} push ${DOCKER_TAG}
 
 #####################################################################
 # TEST
