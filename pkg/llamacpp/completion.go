@@ -47,7 +47,7 @@ func (l *Llama) Complete(ctx context.Context, req schema.CompletionRequest, onCh
 			}
 		}
 
-		text, err := task.Context().CompleteNative(req.Prompt, opts)
+		text, stopWordHit, err := task.Context().CompleteNativeWithStopInfo(req.Prompt, opts)
 		if err != nil {
 			return err
 		}
@@ -59,11 +59,13 @@ func (l *Llama) Complete(ctx context.Context, req schema.CompletionRequest, onCh
 		if err != nil {
 			return err
 		}
+		finishReason := completionFinishReason(req, text, usage, stopWordHit)
 
 		result = &schema.CompletionResponse{
-			Model: req.Model,
-			Text:  text,
-			Usage: usage,
+			Model:        req.Model,
+			Text:         text,
+			Usage:        usage,
+			FinishReason: finishReason,
 		}
 		return nil
 	})
@@ -98,6 +100,12 @@ func buildCompletionOptions(ctx context.Context, req schema.CompletionRequest) l
 	}
 	if req.TopK != nil {
 		params.TopK = *req.TopK
+	}
+	if req.RepeatPenalty != nil {
+		params.RepeatPenalty = *req.RepeatPenalty
+	}
+	if req.RepeatLastN != nil {
+		params.RepeatLastN = *req.RepeatLastN
 	}
 	opts.SamplerParams = params
 	if ctx != nil {
@@ -134,4 +142,26 @@ func completionUsage(model *llamacpp.Model, prompt, text string) (schema.Usage, 
 		InputTokens:  len(promptTokens),
 		OutputTokens: outputTokens,
 	}, nil
+}
+
+func completionFinishReason(req schema.CompletionRequest, text string, usage schema.Usage, stopWordHit bool) string {
+	maxTokens := 0
+	if req.MaxTokens != nil {
+		maxTokens = int(*req.MaxTokens)
+	} else {
+		maxTokens = llamacpp.DefaultCompletionOptions().MaxTokens
+	}
+
+	// Check if we hit max tokens - this is highest priority
+	if maxTokens > 0 && usage.OutputTokens >= maxTokens {
+		return schema.CompletionFinishReasonMaxTokens
+	}
+
+	// Check if a stop sequence was hit
+	// The C++ backend now tells us explicitly via stopWordHit
+	if stopWordHit {
+		return schema.CompletionFinishReasonStop
+	}
+
+	return schema.CompletionFinishReasonEOS
 }

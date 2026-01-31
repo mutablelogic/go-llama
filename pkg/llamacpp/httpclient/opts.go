@@ -18,13 +18,15 @@ type opt struct {
 	Mlock  *bool
 
 	// Completion options
-	MaxTokens   *int32
-	Temperature *float32
-	TopP        *float32
-	TopK        *int32
-	Seed        *uint32
-	Stop        []string
-	PrefixCache *bool
+	MaxTokens     *int32
+	Temperature   *float32
+	TopP          *float32
+	TopK          *int32
+	RepeatPenalty *float32
+	RepeatLastN   *int32
+	Seed          *uint32
+	Stop          []string
+	PrefixCache   *bool
 
 	// Embedding options
 	Normalize *bool
@@ -36,7 +38,8 @@ type opt struct {
 	UnparseSpecial *bool
 
 	// Streaming callback
-	chunkCallback func(*schema.CompletionChunk) error
+	chunkCallback    func(*schema.CompletionChunk) error
+	progressCallback func(filename string, bytesReceived, totalBytes uint64) error
 }
 
 // Opt is an option to set on the client request.
@@ -140,6 +143,28 @@ func WithTopK(topK int32) Opt {
 	}
 }
 
+// WithRepeatPenalty sets the repeat penalty (1.0 = disabled).
+func WithRepeatPenalty(repeatPenalty float32) Opt {
+	return func(o *opt) error {
+		if repeatPenalty < 0 {
+			return fmt.Errorf("repeat_penalty must be >= 0")
+		}
+		o.RepeatPenalty = &repeatPenalty
+		return nil
+	}
+}
+
+// WithRepeatLastN sets the repeat penalty window size.
+func WithRepeatLastN(repeatLastN int32) Opt {
+	return func(o *opt) error {
+		if repeatLastN < 0 {
+			return fmt.Errorf("repeat_last_n must be >= 0")
+		}
+		o.RepeatLastN = &repeatLastN
+		return nil
+	}
+}
+
 // WithSeed sets the RNG seed for reproducible generation.
 func WithSeed(seed uint32) Opt {
 	return func(o *opt) error {
@@ -169,6 +194,15 @@ func WithPrefixCache(prefixCache bool) Opt {
 func WithChunkCallback(callback func(*schema.CompletionChunk) error) Opt {
 	return func(o *opt) error {
 		o.chunkCallback = callback
+		return nil
+	}
+}
+
+// WithProgressCallback sets a callback function to receive progress updates.
+// This enables streaming support for model pull operations.
+func WithProgressCallback(callback func(filename string, bytesReceived, totalBytes uint64) error) Opt {
+	return func(o *opt) error {
+		o.progressCallback = callback
 		return nil
 	}
 }

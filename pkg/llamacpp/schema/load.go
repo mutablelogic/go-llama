@@ -14,10 +14,16 @@ import (
 // LoadModelRequest contains the parameters for loading a model into memory.
 type LoadModelRequest struct {
 	Name   string `json:"name"`                 // Model name or path to load
+	Load   *bool  `json:"load,omitempty"`       // Load (true) or unload (false) model (nil = load)
 	Gpu    *int32 `json:"gpu,omitempty"`        // Main GPU index (nil = default)
 	Layers *int32 `json:"gpu_layers,omitempty"` // Number of layers to offload to GPU (nil = default, -1 = all)
 	Mmap   *bool  `json:"use_mmap,omitempty"`   // Use memory mapping for model loading (nil = default)
 	Mlock  *bool  `json:"use_mlock,omitempty"`  // Lock model in memory (nil = default)
+}
+
+// PullModelRequest contains the parameters for downloading a model from a URL.
+type PullModelRequest struct {
+	URL string `json:"url"` // URL to download the model from (supports hf:// and https://)
 }
 
 // CachedModel represents a model that has been loaded into memory.
@@ -25,7 +31,8 @@ type LoadModelRequest struct {
 type CachedModel struct {
 	sync.RWMutex
 	Model
-	LoadedAt time.Time       `json:"loaded_at"`
+	LoadedAt time.Time       `json:"loaded_at,omitzero"`
+	Runtime  *ModelRuntime   `json:"runtime,omitempty"`
 	Handle   *llamacpp.Model `json:"-"`
 }
 
@@ -46,6 +53,10 @@ type ContextRequest struct {
 // STRINGIFY
 
 func (r LoadModelRequest) String() string {
+	return stringify(r)
+}
+
+func (r PullModelRequest) String() string {
 	return stringify(r)
 }
 

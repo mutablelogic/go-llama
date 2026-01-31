@@ -4,6 +4,7 @@ ARG BASE_RUN_CONTAINER=debian:${BASE_TAG}
 ARG GO_VERSION=1.25.6
 ARG ARCH
 ARG OS
+ARG BUILD_JOBS=-j2
 
 # Setup build container
 FROM ${BASE_DEV_CONTAINER} AS build
@@ -25,7 +26,7 @@ COPY . .
 
 # Make gollama with Vulkan support (disable native CPU optimizations for portability)
 ENV GGML_VULKAN=1
-RUN make clean && GGML_NATIVE=OFF make gollama
+RUN make clean && GGML_NATIVE=OFF BUILD_JOBS=${BUILD_JOBS} make gollama
 
 # Setup runtime container
 FROM ${BASE_RUN_CONTAINER} AS runtime

@@ -27,8 +27,9 @@ import (
 // TYPES
 
 type Globals struct {
-	// Debug option
+	// Debug options
 	Debug   bool             `name:"debug" help:"Enable debug logging"`
+	Verbose bool             `name:"verbose" help:"Enable verbose logging"`
 	Version kong.VersionFlag `name:"version" help:"Print version and exit"`
 
 	// HTTP server options
@@ -54,7 +55,7 @@ type Globals struct {
 
 type CLI struct {
 	Globals
-	GpuInfo GpuInfoCmd `cmd:"gpuinfo" help:"Show GPU information"`
+	GpuInfo GpuInfoCmd `cmd:"" name:"gpuinfo" help:"Show GPU information"`
 	ModelCommands
 	CompletionCommands
 	EmbedCommands
@@ -162,8 +163,8 @@ func (g *Globals) clientEndpoint(suffix string) (string, []client.ClientOpt, err
 
 	// Client options
 	opts := []client.ClientOpt{}
-	if g.Debug {
-		opts = append(opts, client.OptTrace(os.Stderr, true))
+	if g.Debug || g.Verbose {
+		opts = append(opts, client.OptTrace(os.Stderr, g.Verbose))
 	}
 	if g.tracer != nil {
 		opts = append(opts, client.OptTracer(g.tracer))

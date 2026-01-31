@@ -45,7 +45,7 @@ extern "C" llama_go_completion_params llama_go_completion_default_params() {
 ///////////////////////////////////////////////////////////////////////////////
 // GENERATION
 
-extern "C" char *
+extern "C" struct llama_go_completion_result *
 llama_go_completion_generate(void *ctx_handle, void *model_handle,
                              const char *prompt,
                              const llama_go_completion_params *gen_params) {
@@ -59,6 +59,8 @@ llama_go_completion_generate(void *ctx_handle, void *model_handle,
   int32_t last_piece_len = 0;
   int64_t last_needed = 0;
   size_t last_generated_len = 0;
+  bool stop_word_hit = false;
+  int32_t stop_word_index = -1;
 
   try {
     llama_context *ctx = static_cast<llama_context *>(ctx_handle);
@@ -264,15 +266,27 @@ llama_go_completion_generate(void *ctx_handle, void *model_handle,
                                        stop_len, stop_word) == 0) {
               // Found stop word - remove it and stop
               generated_text.resize(generated_text.length() - stop_len);
+              stop_word_hit = true;
+              stop_word_index = j;
               llama_go_batch_free(batch);
               llama_go_sampler_free(sampler);
 
-              char *result = (char *)malloc(generated_text.length() + 1);
+              struct llama_go_completion_result *result =
+                  (struct llama_go_completion_result *)malloc(
+                      sizeof(struct llama_go_completion_result));
               if (!result) {
                 llama_go_set_error("Failed to allocate result");
                 return nullptr;
               }
-              strcpy(result, generated_text.c_str());
+              result->text = (char *)malloc(generated_text.length() + 1);
+              if (!result->text) {
+                llama_go_set_error("Failed to allocate result text");
+                free(result);
+                return nullptr;
+              }
+              strcpy(result->text, generated_text.c_str());
+              result->stop_word_hit = true;
+              result->index = stop_word_index;
               return result;
             }
           }
@@ -297,12 +311,22 @@ llama_go_completion_generate(void *ctx_handle, void *model_handle,
 
     stage = 15;
     // Allocate result
-    char *result = (char *)malloc(generated_text.length() + 1);
+    struct llama_go_completion_result *result =
+        (struct llama_go_completion_result *)malloc(
+            sizeof(struct llama_go_completion_result));
     if (!result) {
       llama_go_set_error("Failed to allocate result");
       return nullptr;
     }
-    strcpy(result, generated_text.c_str());
+    result->text = (char *)malloc(generated_text.length() + 1);
+    if (!result->text) {
+      llama_go_set_error("Failed to allocate result text");
+      free(result);
+      return nullptr;
+    }
+    strcpy(result->text, generated_text.c_str());
+    result->stop_word_hit = stop_word_hit;
+    result->index = stop_word_index;
     return result;
 
   } catch (const std::exception &e) {
@@ -329,8 +353,12 @@ llama_go_completion_generate(void *ctx_handle, void *model_handle,
   }
 }
 
-extern "C" void llama_go_completion_free_result(char *result) {
+extern "C" void
+llama_go_completion_free_result(struct llama_go_completion_result *result) {
   if (result) {
+    if (result->text) {
+      free(result->text);
+    }
     free(result);
   }
 }

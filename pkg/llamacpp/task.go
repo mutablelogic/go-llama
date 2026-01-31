@@ -89,6 +89,8 @@ func (l *Llama) WithContext(ctx context.Context, req schema.ContextRequest, fn T
 	params := llamacpp.DefaultContextParams()
 	if req.ContextSize != nil {
 		params.NCtx = *req.ContextSize
+	} else if cached.Model.ContextSize > 0 {
+		params.NCtx = uint32(cached.Model.ContextSize)
 	}
 	if req.BatchSize != nil {
 		params.NBatch = *req.BatchSize

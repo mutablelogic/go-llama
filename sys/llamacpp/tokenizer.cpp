@@ -1,6 +1,7 @@
 #include "tokenizer.h"
 #include "error.h"
 #include "model.h"
+#include <cstring>
 #include <llama.h>
 #include <string>
 #include <vector>

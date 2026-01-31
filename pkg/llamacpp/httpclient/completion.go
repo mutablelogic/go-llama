@@ -33,15 +33,17 @@ func (c *Client) Complete(ctx context.Context, model, prompt string, opts ...Opt
 
 	// Build request body
 	reqBody := schema.CompletionRequest{
-		Model:       model,
-		Prompt:      prompt,
-		MaxTokens:   o.MaxTokens,
-		Temperature: o.Temperature,
-		TopP:        o.TopP,
-		TopK:        o.TopK,
-		Seed:        o.Seed,
-		Stop:        o.Stop,
-		PrefixCache: o.PrefixCache,
+		Model:         model,
+		Prompt:        prompt,
+		MaxTokens:     o.MaxTokens,
+		Temperature:   o.Temperature,
+		TopP:          o.TopP,
+		TopK:          o.TopK,
+		RepeatPenalty: o.RepeatPenalty,
+		RepeatLastN:   o.RepeatLastN,
+		Seed:          o.Seed,
+		Stop:          o.Stop,
+		PrefixCache:   o.PrefixCache,
 	}
 
 	req, err := client.NewJSONRequest(reqBody)

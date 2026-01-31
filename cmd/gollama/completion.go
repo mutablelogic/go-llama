@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	// Packages
@@ -21,16 +23,18 @@ type CompletionCommands struct {
 }
 
 type CompleteCommand struct {
-	Model       string   `arg:"" name:"model" help:"Model name or path"`
-	Prompt      string   `arg:"" name:"prompt" optional:"" help:"Prompt text (or use stdin)"`
-	MaxTokens   *int32   `name:"max-tokens" help:"Maximum tokens to generate"`
-	Temperature *float32 `name:"temperature" help:"Sampling temperature (0-2)"`
-	TopP        *float32 `name:"top-p" help:"Nucleus sampling parameter (0-1)"`
-	TopK        *int32   `name:"top-k" help:"Top-k sampling parameter"`
-	Seed        *uint32  `name:"seed" help:"RNG seed for reproducibility"`
-	Stop        []string `name:"stop" help:"Stop sequences"`
-	PrefixCache *bool    `name:"prefix-cache" help:"Enable prefix caching"`
-	Stream      bool     `name:"stream" help:"Stream output tokens" default:"true"`
+	Model         string   `arg:"" name:"model" help:"Model name or path"`
+	Prompt        string   `arg:"" name:"prompt" optional:"" help:"Prompt text (or use stdin)"`
+	MaxTokens     *int32   `name:"max-tokens" help:"Maximum tokens to generate"`
+	Temperature   *float32 `name:"temperature" help:"Sampling temperature (0-2)"`
+	TopP          *float32 `name:"top-p" help:"Nucleus sampling parameter (0-1)"`
+	TopK          *int32   `name:"top-k" help:"Top-k sampling parameter"`
+	RepeatPenalty *float32 `name:"repeat-penalty" help:"Penalize repeated tokens (1.0 = disabled)"`
+	RepeatLastN   *int32   `name:"repeat-last-n" help:"Repeat penalty window size"`
+	Seed          *uint32  `name:"seed" help:"RNG seed for reproducibility"`
+	Stop          []string `name:"stop" help:"Stop sequences"`
+	PrefixCache   *bool    `name:"prefix-cache" help:"Enable prefix caching"`
+	Stream        bool     `name:"stream" help:"Stream output tokens" default:"true"`
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -72,11 +76,18 @@ func (cmd *CompleteCommand) Run(ctx *Globals) (err error) {
 	if cmd.TopK != nil {
 		opts = append(opts, httpclient.WithTopK(*cmd.TopK))
 	}
+	if cmd.RepeatPenalty != nil {
+		opts = append(opts, httpclient.WithRepeatPenalty(*cmd.RepeatPenalty))
+	}
+	if cmd.RepeatLastN != nil {
+		opts = append(opts, httpclient.WithRepeatLastN(*cmd.RepeatLastN))
+	}
 	if cmd.Seed != nil {
 		opts = append(opts, httpclient.WithSeed(*cmd.Seed))
 	}
 	if len(cmd.Stop) > 0 {
-		opts = append(opts, httpclient.WithStop(cmd.Stop...))
+		stopSeqs := unescapeStopSequences(cmd.Stop)
+		opts = append(opts, httpclient.WithStop(stopSeqs...))
 	}
 	if cmd.PrefixCache != nil {
 		opts = append(opts, httpclient.WithPrefixCache(*cmd.PrefixCache))
@@ -84,7 +95,17 @@ func (cmd *CompleteCommand) Run(ctx *Globals) (err error) {
 
 	// Add streaming callback if requested
 	if cmd.Stream {
+		printedPrompt := false
 		opts = append(opts, httpclient.WithChunkCallback(func(chunk *schema.CompletionChunk) error {
+			if !printedPrompt {
+				// Print prompt in white bold if output is to terminal
+				if isTerminal(os.Stdout) {
+					fmt.Printf("\033[1;37m%s\033[0m", prompt) // White bold, then reset
+				} else {
+					fmt.Print(prompt)
+				}
+				printedPrompt = true
+			}
 			fmt.Print(chunk.Text)
 			return nil
 		}))
@@ -95,12 +116,29 @@ func (cmd *CompleteCommand) Run(ctx *Globals) (err error) {
 	if err != nil {
 		return err
 	}
+	if ctx.Debug {
+		if b, err := json.MarshalIndent(result, "", "  "); err == nil {
+			fmt.Fprintln(os.Stderr, string(b))
+		}
+	}
 
 	// Print result if not streaming (streaming already printed chunks)
 	if !cmd.Stream {
-		fmt.Print(result.Text)
+		// Print prompt in white bold if output is to terminal
+		if isTerminal(os.Stdout) {
+			fmt.Printf("\033[1;37m%s\033[0m%s", prompt, result.Text) // White bold prompt, then normal completion
+		} else {
+			fmt.Printf("%s%s", prompt, result.Text)
+		}
 	}
-	fmt.Println() // Ensure newline at end
+	if cmd.Stream {
+		fmt.Print("\n") // Ensure newline at end of stream
+	} else {
+		fmt.Println() // Ensure newline at end
+	}
+	if result.FinishReason != "" {
+		fmt.Printf("[finish_reason=%s]\n", result.FinishReason)
+	}
 
 	return nil
 }
@@ -133,4 +171,20 @@ func readStdin() (string, error) {
 	}
 
 	return strings.TrimSpace(builder.String()), nil
+}
+
+// unescapeStopSequences interprets escape sequences in stop strings
+// Handles common sequences like \n, \t, \r, and \\
+func unescapeStopSequences(stops []string) []string {
+	result := make([]string, len(stops))
+	for i, stop := range stops {
+		// Use strconv.Unquote to handle standard Go escape sequences
+		if unquoted, err := strconv.Unquote(`"` + stop + `"`); err == nil {
+			result[i] = unquoted
+		} else {
+			// If unquote fails, use the string as-is
+			result[i] = stop
+		}
+	}
+	return result
 }
