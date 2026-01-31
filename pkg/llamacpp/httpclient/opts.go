@@ -41,8 +41,9 @@ type opt struct {
 	UnparseSpecial *bool
 
 	// Streaming callback
-	chunkCallback    func(*schema.CompletionChunk) error
-	progressCallback func(filename string, bytesReceived, totalBytes uint64) error
+	chunkCallback     func(*schema.CompletionChunk) error
+	chatChunkCallback func(*schema.ChatChunk) error
+	progressCallback  func(filename string, bytesReceived, totalBytes uint64) error
 }
 
 // Opt is an option to set on the client request.
@@ -205,6 +206,14 @@ func WithSystem(system string) Opt {
 func WithChunkCallback(callback func(*schema.CompletionChunk) error) Opt {
 	return func(o *opt) error {
 		o.chunkCallback = callback
+		return nil
+	}
+}
+
+// WithChatChunkCallback sets a callback function to receive streaming chat chunks.
+func WithChatChunkCallback(callback func(*schema.ChatChunk) error) Opt {
+	return func(o *opt) error {
+		o.chatChunkCallback = callback
 		return nil
 	}
 }

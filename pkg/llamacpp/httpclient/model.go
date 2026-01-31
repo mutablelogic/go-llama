@@ -165,7 +165,12 @@ func (c *Client) UnloadModel(ctx context.Context, id string) (*schema.CachedMode
 		return nil, fmt.Errorf("model id cannot be empty")
 	}
 
-	reqBody := map[string]any{"load": false}
+	// Build request body with Load set to false
+	loadFalse := false
+	reqBody := schema.LoadModelRequest{
+		Name: id,
+		Load: &loadFalse,
+	}
 	req, err := client.NewJSONRequest(reqBody)
 	if err != nil {
 		return nil, err

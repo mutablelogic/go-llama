@@ -201,9 +201,10 @@ func (l *Llama) UnloadModel(ctx context.Context, name string) (result *schema.Ca
 	delete(l.cached, model.Path)
 
 	// Return uncached model (zero timestamp, nil handle)
-	return &schema.CachedModel{
+	result = &schema.CachedModel{
 		Model: *model,
-	}, nil
+	}
+	return result, nil
 }
 
 // DeleteModel deletes a model from disk and removes it from the cache if loaded.

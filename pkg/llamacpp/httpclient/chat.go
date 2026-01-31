@@ -69,7 +69,7 @@ func (c *Client) Chat(ctx context.Context, model string, messages []schema.ChatM
 
 	// If streaming callback provided, handle streaming
 	var response schema.ChatResponse
-	if o.chunkCallback != nil {
+	if o.chatChunkCallback != nil || o.chunkCallback != nil {
 		reqOpts = append(reqOpts, client.OptReqHeader("Accept", "text/event-stream"))
 		reqOpts = append(reqOpts, client.OptTextStreamCallback(func(evt client.TextStreamEvent) error {
 			switch evt.Event {
@@ -78,9 +78,15 @@ func (c *Client) Chat(ctx context.Context, model string, messages []schema.ChatM
 				if err := evt.Json(&chunk); err != nil {
 					return err
 				}
-				// Convert ChatChunk to CompletionChunk for callback compatibility
-				completionChunk := schema.CompletionChunk{Text: chunk.Message.Content}
-				return o.chunkCallback(&completionChunk)
+				if o.chatChunkCallback != nil {
+					return o.chatChunkCallback(&chunk)
+				}
+				if o.chunkCallback != nil {
+					// Convert ChatChunk to CompletionChunk for callback compatibility
+					completionChunk := schema.CompletionChunk{Text: chunk.Message.Content}
+					return o.chunkCallback(&completionChunk)
+				}
+				return nil
 			case schema.CompletionStreamDoneType:
 				// Parse final response
 				if err := evt.Json(&response); err != nil {

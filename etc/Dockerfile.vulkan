@@ -25,8 +25,12 @@ WORKDIR /app
 COPY . .
 
 # Make gollama with Vulkan support (disable native CPU optimizations for portability)
-ENV GGML_VULKAN=1
-RUN make clean && GGML_NATIVE=OFF BUILD_JOBS=${BUILD_JOBS} make gollama
+RUN make clean \
+    && GGML_VULKAN=1 \
+    GGML_NATIVE=OFF \
+    CMAKE_BUILD_PARALLEL_LEVEL=1 \
+    BUILD_JOBS=${BUILD_JOBS} \
+    make gollama
 
 # Setup runtime container
 FROM ${BASE_RUN_CONTAINER} AS runtime
