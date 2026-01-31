@@ -1,5 +1,6 @@
 #include "completion.h"
 #include "batch.h"
+#include "context.h"
 #include "error.h"
 #include "sampler.h"
 #include "tokenizer.h"
@@ -104,8 +105,17 @@ llama_go_completion_generate(void *ctx_handle, void *model_handle,
 
     prompt_tokens.resize(n_prompt);
 
-    // Check context size
+    // Check context and batch sizes
     const int32_t n_ctx = llama_n_ctx(ctx);
+    const uint32_t n_batch = llama_go_context_n_batch(ctx_handle);
+    if (n_batch == 0) {
+      llama_go_set_error("Invalid batch size (n_batch=0)");
+      return nullptr;
+    }
+    if (n_prompt > (int32_t)n_batch) {
+      llama_go_set_error("Prompt exceeds batch size (n_prompt > n_batch)");
+      return nullptr;
+    }
     if (n_prompt + gen_params->max_tokens > n_ctx) {
       llama_go_set_error("Prompt + max_tokens exceeds context size");
       return nullptr;
@@ -132,7 +142,7 @@ llama_go_completion_generate(void *ctx_handle, void *model_handle,
 
     stage = 5;
     // Create batch using wrapper
-    llama_go_batch *batch = llama_go_batch_init(n_ctx, 1);
+    llama_go_batch *batch = llama_go_batch_init((int32_t)n_batch, 1);
     if (!batch) {
       llama_go_sampler_free(sampler);
       llama_go_set_error("Failed to create batch");

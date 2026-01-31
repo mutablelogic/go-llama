@@ -26,6 +26,10 @@ func (l *Llama) Chat(ctx context.Context, req schema.ChatRequest, onChunk func(s
 	)
 	defer func() { endSpan(err) }()
 
+	if len(req.Stop) == 0 {
+		req.Stop = defaultStopSequences
+	}
+
 	// Create a context, and run the chat completion
 	err = l.WithContext(ctx, schema.ContextRequest{
 		LoadModelRequest: schema.LoadModelRequest{
@@ -44,17 +48,25 @@ func (l *Llama) Chat(ctx context.Context, req schema.ChatRequest, onChunk func(s
 		opts := buildCompletionOptions(ctx, req.CompletionRequest)
 		var callbackErr error
 		var splitter *thinkingStreamSplitter
+		var stopFilter *stopMarkerFilter
 		if onChunk != nil {
 			splitter = newThinkingStreamSplitter()
+			stopFilter = newStopMarkerFilter(req.Stop)
 			opts.OnToken = func(token string) bool {
 				if callbackErr != nil {
 					return false
 				}
-				for _, chunk := range splitter.Process(token) {
-					if err := onChunk(chunk); err != nil {
-						callbackErr = err
-						return false
+				trimmed, stopped := stopFilter.Process(token)
+				if trimmed != "" {
+					for _, chunk := range splitter.Process(trimmed) {
+						if err := onChunk(chunk); err != nil {
+							callbackErr = err
+							return false
+						}
 					}
+				}
+				if stopped {
+					return false
 				}
 				return true
 			}
@@ -67,6 +79,18 @@ func (l *Llama) Chat(ctx context.Context, req schema.ChatRequest, onChunk func(s
 		if callbackErr != nil {
 			return callbackErr
 		}
+
+		if onChunk != nil && splitter != nil && stopFilter != nil && !stopFilter.Stopped() {
+			if tail := stopFilter.Flush(); tail != "" {
+				for _, chunk := range splitter.Process(tail) {
+					if err := onChunk(chunk); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		text, _ = trimAtStop(text, req.Stop)
 
 		usage, err := completionUsage(task.Model(), prompt, text)
 		if err != nil {
@@ -241,4 +265,99 @@ func maxTagLen(tags []string) int {
 		return 1
 	}
 	return max
+}
+
+var defaultStopSequences = []string{
+	"<|end|>",
+	"<|end|}",
+	"<|",
+	"</s>",
+	"<|eos|>",
+	"<|endoftext|>",
+	"<|user|>",
+	"<|assistant|>",
+	"<|system|>",
+}
+
+type stopMarkerFilter struct {
+	stops   []string
+	maxLen  int
+	buffer  string
+	stopped bool
+}
+
+func newStopMarkerFilter(stops []string) *stopMarkerFilter {
+	maxLen := 0
+	for _, s := range stops {
+		if len(s) > maxLen {
+			maxLen = len(s)
+		}
+	}
+	return &stopMarkerFilter{stops: stops, maxLen: maxLen}
+}
+
+func (f *stopMarkerFilter) Stopped() bool {
+	return f.stopped
+}
+
+func (f *stopMarkerFilter) Process(text string) (string, bool) {
+	if f.stopped {
+		return "", true
+	}
+	if text == "" {
+		return "", false
+	}
+
+	combined := f.buffer + text
+	idx, found := indexAnyStop(combined, f.stops)
+	if found {
+		f.stopped = true
+		return combined[:idx], true
+	}
+
+	if f.maxLen <= 1 {
+		f.buffer = ""
+		return combined, false
+	}
+	keep := f.maxLen - 1
+	if len(combined) <= keep {
+		f.buffer = combined
+		return "", false
+	}
+	cut := len(combined) - keep
+	out := combined[:cut]
+	f.buffer = combined[cut:]
+	return out, false
+}
+
+func (f *stopMarkerFilter) Flush() string {
+	if f.stopped || f.buffer == "" {
+		return ""
+	}
+	out := f.buffer
+	f.buffer = ""
+	return out
+}
+
+func indexAnyStop(s string, stops []string) (int, bool) {
+	idx := -1
+	for _, stop := range stops {
+		if stop == "" {
+			continue
+		}
+		if i := strings.Index(s, stop); i >= 0 {
+			if idx == -1 || i < idx {
+				idx = i
+			}
+		}
+	}
+	return idx, idx >= 0
+}
+
+func trimAtStop(content string, stops []string) (string, bool) {
+	idx, found := indexAnyStop(content, stops)
+	if !found {
+		return content, false
+	}
+	return content[:idx], true
 }

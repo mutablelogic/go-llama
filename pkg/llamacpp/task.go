@@ -93,6 +93,9 @@ func (l *Llama) WithContext(ctx context.Context, req schema.ContextRequest, fn T
 	}
 	if req.BatchSize != nil {
 		params.NBatch = *req.BatchSize
+	} else if params.NCtx > 0 {
+		// Ensure batch size can accommodate full prompt decode
+		params.NBatch = params.NCtx
 	}
 	if req.UBatchSize != nil {
 		params.NUBatch = *req.UBatchSize

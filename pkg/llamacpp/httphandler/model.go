@@ -141,17 +141,15 @@ func modelPull(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.L
 // modelLoadUnload handles POST /model/{id} requests to load or unload a specific model by id
 func modelLoadUnload(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
 	var req schema.LoadModelRequest
-
-	// Read any load/unload options from request body (optional)
-	if r.ContentLength > 0 {
-		if err := httprequest.Read(r, &req); err != nil {
-			return httpresponse.Error(w, httpresponse.ErrBadRequest.With(err.Error()))
-		}
+	if err := httprequest.Read(r, &req); err != nil {
+		return httpresponse.Error(w, httpresponse.ErrBadRequest.With(err.Error()))
+	} else {
+		req.Name = r.PathValue("id")
 	}
 
-	// Ensure the id from URL takes precedence
-	req.Name = r.PathValue("id")
-	if req.Load != nil && !*req.Load {
+	// Check if this is an unload request
+	isUnload := req.Load != nil && !*req.Load
+	if isUnload {
 		if model, err := llamaInstance.UnloadModel(r.Context(), req.Name); err != nil {
 			return httpresponse.Error(w, httperr(err))
 		} else {

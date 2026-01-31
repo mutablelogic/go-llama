@@ -1,7 +1,6 @@
 package store
 
 import (
-	// Packages
 	"context"
 	"io"
 	"mime"
@@ -10,10 +9,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/mutablelogic/go-client"
-	"github.com/mutablelogic/go-llama"
-	"github.com/mutablelogic/go-server/pkg/types"
+	// Packages
+	client "github.com/mutablelogic/go-client"
+	llama "github.com/mutablelogic/go-llama"
+	types "github.com/mutablelogic/go-server/pkg/types"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -47,6 +48,8 @@ type ClientModel struct {
 	n        uint64 // Number of bytes written
 	size     uint64 // Total size from Content-Length header
 	filename string // Filename from Content-Disposition header
+
+	lastUpdate time.Time
 }
 
 var _ client.Unmarshaler = (*ClientModel)(nil)
@@ -74,8 +77,13 @@ func NewClient(opts ...client.ClientOpt) (*Client, error) {
 	}
 }
 
+const pullProgressMinInterval = 500 * time.Millisecond
+
 func NewClientModel(w io.Writer, fn ClientCallback) *ClientModel {
-	return &ClientModel{w: w, fn: fn}
+	return &ClientModel{
+		w:  w,
+		fn: fn,
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -223,8 +231,14 @@ func (g *ClientModel) Write(p []byte) (int, error) {
 	n, err := g.w.Write(p)
 	g.n += uint64(n)
 	if g.fn != nil {
-		if cbErr := g.fn(g.filename, g.n, g.size); cbErr != nil {
-			return n, cbErr
+		shouldNotify := g.lastUpdate.IsZero() ||
+			time.Since(g.lastUpdate) >= pullProgressMinInterval ||
+			(g.size > 0 && g.n >= g.size)
+		if shouldNotify {
+			if cbErr := g.fn(g.filename, g.n, g.size); cbErr != nil {
+				return n, cbErr
+			}
+			g.lastUpdate = time.Now()
 		}
 	}
 	return n, err

@@ -100,9 +100,6 @@ func (s *Store) DeleteModel(ctx context.Context, name string) error {
 // Supports HuggingFace URLs with hf:// scheme and regular HTTP(S) URLs.
 // The callback receives progress updates during download.
 func (s *Store) PullModel(ctx context.Context, url string, callback ClientCallback) (*schema.Model, error) {
-	s.Lock()
-	defer s.Unlock()
-
 	// Get the suggested destination path first
 	destPath, err := s.client.GetDestPath(url)
 	if err != nil {
@@ -172,7 +169,12 @@ func (s *Store) PullModel(ctx context.Context, url string, callback ClientCallba
 		return nil, llama.ErrInvalidModel.With("downloaded file is empty")
 	}
 
-	// Move temporary file to final location
+	// Move temporary file to final location (synchronized)
+	s.Lock()
+	defer s.Unlock()
+	if _, err := os.Stat(finalPath); err == nil {
+		return nil, llama.ErrInvalidArgument.Withf("model already exists at %s", destPath)
+	}
 	if err := os.Rename(tempPath, finalPath); err != nil {
 		return nil, llama.ErrOpenFailed.Withf("failed to move file to final location: %v", err)
 	}

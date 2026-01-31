@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 
 	// Packages
-	"github.com/chzyer/readline"
+	readline "github.com/chzyer/readline"
 	otel "github.com/mutablelogic/go-client/pkg/otel"
 	httpclient "github.com/mutablelogic/go-llama/pkg/llamacpp/httpclient"
 	schema "github.com/mutablelogic/go-llama/pkg/llamacpp/schema"
@@ -55,7 +54,7 @@ func (cmd *ChatCommand) Run(ctx *Globals) (err error) {
 	// Get system prompt from argument or stdin (only if stdin isn't used for messages)
 	stdinHasData := stdinHasData()
 	system := cmd.System
-	if system == "" && !stdinHasData {
+	if system == "" {
 		system, err = readStdin()
 		if err != nil {
 			return err
@@ -295,8 +294,22 @@ func readChatMessages() ([]schema.ChatMessage, error) {
 	return messages, nil
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// HELPER FUNCTIONS
+
+// stdinHasData checks if stdin has pipe or redirect data
+func stdinHasData() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (info.Mode() & os.ModeCharDevice) == 0
+}
+
+// buildChatOpts builds httpclient options from command flags
 func buildChatOpts(cmd *ChatCommand, system string) ([]httpclient.Opt, error) {
-	opts := []httpclient.Opt{}
+	var opts []httpclient.Opt
+
 	if system != "" {
 		opts = append(opts, httpclient.WithSystem(system))
 	}
@@ -322,8 +335,7 @@ func buildChatOpts(cmd *ChatCommand, system string) ([]httpclient.Opt, error) {
 		opts = append(opts, httpclient.WithSeed(*cmd.Seed))
 	}
 	if len(cmd.Stop) > 0 {
-		stopSeqs := unescapeStopSequences(cmd.Stop)
-		opts = append(opts, httpclient.WithStop(stopSeqs...))
+		opts = append(opts, httpclient.WithStop(cmd.Stop...))
 	}
 	if cmd.PrefixCache != nil {
 		opts = append(opts, httpclient.WithPrefixCache(*cmd.PrefixCache))
@@ -332,9 +344,9 @@ func buildChatOpts(cmd *ChatCommand, system string) ([]httpclient.Opt, error) {
 	return opts, nil
 }
 
+// rolePrinter prints content with role-specific formatting
 type rolePrinter struct {
 	isTerminal bool
-	current    string
 }
 
 func newRolePrinter(isTerminal bool) *rolePrinter {
@@ -342,262 +354,165 @@ func newRolePrinter(isTerminal bool) *rolePrinter {
 }
 
 func (p *rolePrinter) Print(role, content string) {
-	if content == "" {
+	if !p.isTerminal {
+		fmt.Print(content)
 		return
 	}
-	if role == "" {
-		role = "assistant"
-	}
 
-	if p.current != role {
-		if p.current != "" {
-			fmt.Print("\n")
-		}
-		p.printPrefix(role)
-		p.current = role
-	}
-
-	if p.isTerminal {
-		fmt.Print(roleColor(role))
-		fmt.Print(content)
-		fmt.Print(colorReset)
-	} else {
-		fmt.Print(content)
-	}
-}
-
-func (p *rolePrinter) printPrefix(role string) {
-	if p.isTerminal {
-		fmt.Print(roleColor(role))
-		fmt.Printf("%s: ", role)
-		fmt.Print(colorReset)
-	} else {
-		fmt.Printf("%s: ", role)
-	}
-}
-
-const (
-	colorReset     = "\033[0m"
-	colorAssistant = "\033[1;37m"
-	colorThinking  = "\033[0;90m"
-)
-
-func roleColor(role string) string {
 	switch role {
+	case "assistant":
+		// Bold white for assistant
+		fmt.Printf("\033[1;37m%s\033[0m", content)
 	case "thinking":
-		return colorThinking
+		// Dark grey for thinking/reasoning
+		fmt.Printf("\033[0;90m%s\033[0m", content)
 	default:
-		return colorAssistant
+		fmt.Print(content)
 	}
 }
 
-func printWithFallback(printer *rolePrinter, splitter *thinkingStreamSplitter, chunk *schema.ChatChunk) bool {
-	role := strings.TrimSpace(chunk.Message.Role)
-	content := chunk.Message.Content
-
-	if role == "thinking" {
-		printer.Print("thinking", content)
-		return true
-	}
-
-	if role == "" || role == "assistant" {
-		if splitter.HasState() || containsThinkingTags(content) {
-			for _, msg := range splitter.Process(content) {
-				printer.Print(msg.Role, msg.Content)
-			}
-			return true
-		}
-	}
-
-	return false
-}
-
-func printNonStreaming(printer *rolePrinter, result *schema.ChatResponse) string {
-	if result == nil {
-		return ""
-	}
-	if result.Thinking != nil && result.Thinking.Content != "" {
-		printer.Print(result.Thinking.Role, result.Thinking.Content)
-		printer.Print(result.Message.Role, result.Message.Content)
-		return result.Message.Content
-	}
-	thinking, content, ok := parseThinkingText(result.Message.Content)
-	if ok {
-		printer.Print("thinking", thinking)
-		printer.Print(result.Message.Role, content)
-		return content
-	}
-	printer.Print(result.Message.Role, result.Message.Content)
-	return result.Message.Content
-}
-
-// thinkingStreamSplitter splits <think>...</think> blocks into role-based messages.
+// thinkingStreamSplitter processes chat chunks and splits thinking from assistant
 type thinkingStreamSplitter struct {
-	inThinking bool
-	buffer     string
+	buffer string
 }
-
-var (
-	thinkingOpenTags  = []string{"<think>", "<reasoning>", "<scratchpad>", "<thought>", "<internal>"}
-	thinkingCloseTags = []string{"</think>", "</reasoning>", "</scratchpad>", "</thought>", "</internal>"}
-	maxThinkingTagLen = maxTagLen(append(thinkingOpenTags, thinkingCloseTags...))
-)
 
 func newThinkingStreamSplitter() *thinkingStreamSplitter {
 	return &thinkingStreamSplitter{}
 }
 
-func (f *thinkingStreamSplitter) HasState() bool {
-	return f.inThinking || f.buffer != ""
+// Process returns true if the chunk was handled (thinking block)
+func (s *thinkingStreamSplitter) Process(chunk *schema.ChatChunk) (*schema.ChatChunk, bool) {
+	if chunk == nil {
+		return nil, false
+	}
+
+	s.buffer += chunk.Message.Content
+
+	// Look for thinking end tags
+	thinkTags := []string{"</think>", "</reasoning>", "</scratchpad>", "</thought>", "</internal>"}
+	for _, tag := range thinkTags {
+		if idx := strings.Index(s.buffer, tag); idx >= 0 {
+			// Found end of thinking block
+			return nil, true
+		}
+	}
+
+	// Not yet complete
+	return nil, false
 }
 
-func (f *thinkingStreamSplitter) Process(chunk string) []schema.ChatMessage {
-	return f.process(chunk, false)
+// Flush returns any remaining content
+func (s *thinkingStreamSplitter) Flush() string {
+	result := s.buffer
+	s.buffer = ""
+	return result
 }
 
-func (f *thinkingStreamSplitter) Flush() []schema.ChatMessage {
-	return f.process("", true)
-}
-
-func (f *thinkingStreamSplitter) process(chunk string, flush bool) []schema.ChatMessage {
-	if chunk == "" && !flush {
-		return nil
-	}
-
-	s := f.buffer + chunk
-	if !flush {
-		limit := len(s) - (maxThinkingTagLen - 1)
-		if limit < 0 {
-			f.buffer = s
-			return nil
-		}
-		f.buffer = s[limit:]
-		s = s[:limit]
-	} else {
-		f.buffer = ""
-	}
-
-	var out []schema.ChatMessage
-	var current strings.Builder
-	currentRole := "assistant"
-	if f.inThinking {
-		currentRole = "thinking"
-	}
-
-	flushCurrent := func() {
-		if current.Len() == 0 {
-			return
-		}
-		out = append(out, schema.ChatMessage{Role: currentRole, Content: current.String()})
-		current.Reset()
-	}
-
-	for i := 0; i < len(s); {
-		if f.inThinking {
-			if tagLen := matchTag(s, i, thinkingCloseTags); tagLen > 0 {
-				flushCurrent()
-				f.inThinking = false
-				currentRole = "assistant"
-				i += tagLen
-				continue
-			}
-			current.WriteByte(s[i])
-			i++
-			continue
-		}
-
-		if tagLen := matchTag(s, i, thinkingOpenTags); tagLen > 0 {
-			flushCurrent()
-			f.inThinking = true
-			currentRole = "thinking"
-			i += tagLen
-			continue
-		}
-
-		current.WriteByte(s[i])
-		i++
-	}
-
-	flushCurrent()
-	return out
-}
-
-func parseThinkingText(text string) (string, string, bool) {
-	if text == "" {
-		return "", "", false
-	}
-
-	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`(?s)<think>(.*?)</think>`),
-		regexp.MustCompile(`(?s)<reasoning>(.*?)</reasoning>`),
-		regexp.MustCompile(`(?s)<scratchpad>(.*?)</scratchpad>`),
-		regexp.MustCompile(`(?s)<thought>(.*?)</thought>`),
-		regexp.MustCompile(`(?s)<internal>(.*?)</internal>`),
-	}
-
-	remaining := text
-	var allThinking []string
-	for _, pattern := range patterns {
-		matches := pattern.FindAllStringSubmatch(remaining, -1)
-		for _, match := range matches {
-			if len(match) >= 2 {
-				allThinking = append(allThinking, strings.TrimSpace(match[1]))
-			}
-		}
-		remaining = pattern.ReplaceAllString(remaining, "")
-	}
-
-	if len(allThinking) == 0 {
-		return "", text, false
-	}
-
-	return strings.Join(allThinking, "\n\n"), strings.TrimSpace(remaining), true
-}
-
-func containsThinkingTags(text string) bool {
-	if text == "" {
+// printWithFallback prints content with fallback thinking parsing if needed
+func printWithFallback(printer *rolePrinter, splitter *thinkingStreamSplitter, chunk *schema.ChatChunk) bool {
+	if chunk == nil {
 		return false
 	}
-	for _, tag := range thinkingOpenTags {
-		if strings.Contains(text, tag) {
-			return true
+
+	// If chunk already has a thinking role, print it
+	if chunk.Message.Role == "thinking" {
+		printer.Print("thinking", chunk.Message.Content)
+		return true
+	}
+
+	// If chunk has assistant role, check if content contains thinking tags
+	if chunk.Message.Role == "assistant" {
+		content := chunk.Message.Content
+
+		// Look for thinking start tags
+		thinkStartTags := []string{"<think>", "<reasoning>", "<scratchpad>", "<thought>", "<internal>"}
+		hasThinkingStart := false
+		for _, tag := range thinkStartTags {
+			if strings.Contains(content, tag) {
+				hasThinkingStart = true
+				break
+			}
+		}
+
+		if hasThinkingStart {
+			// Parse thinking blocks and print them separately
+			return parseAndPrintThinkingBlocks(printer, content)
 		}
 	}
-	for _, tag := range thinkingCloseTags {
-		if strings.Contains(text, tag) {
-			return true
-		}
-	}
+
 	return false
 }
 
-func matchTag(s string, i int, tags []string) int {
-	for _, tag := range tags {
-		if len(s)-i >= len(tag) && s[i:i+len(tag)] == tag {
-			return len(tag)
+// parseAndPrintThinkingBlocks finds and prints thinking blocks separately
+func parseAndPrintThinkingBlocks(printer *rolePrinter, content string) bool {
+	thinkTags := map[string]string{
+		"<think>":      "</think>",
+		"<reasoning>":  "</reasoning>",
+		"<scratchpad>": "</scratchpad>",
+		"<thought>":    "</thought>",
+		"<internal>":   "</internal>",
+	}
+
+	hasThinking := false
+	remaining := content
+
+	for startTag, endTag := range thinkTags {
+		for {
+			startIdx := strings.Index(remaining, startTag)
+			if startIdx == -1 {
+				break
+			}
+
+			endIdx := strings.Index(remaining[startIdx:], endTag)
+			if endIdx == -1 {
+				break
+			}
+
+			endIdx += startIdx
+
+			// Print text before thinking block as assistant
+			if startIdx > 0 {
+				printer.Print("assistant", remaining[:startIdx])
+			}
+
+			// Extract and print thinking content
+			thinkContent := remaining[startIdx+len(startTag) : endIdx]
+			printer.Print("thinking", thinkContent)
+
+			remaining = remaining[endIdx+len(endTag):]
+			hasThinking = true
 		}
 	}
-	return 0
+
+	// Print any remaining content as assistant
+	if remaining != "" {
+		printer.Print("assistant", remaining)
+	}
+
+	return hasThinking
 }
 
-func maxTagLen(tags []string) int {
-	max := 0
-	for _, tag := range tags {
-		if len(tag) > max {
-			max = len(tag)
-		}
+// printNonStreaming prints non-streamed response with thinking handling
+func printNonStreaming(printer *rolePrinter, result *schema.ChatResponse) string {
+	if result == nil {
+		return ""
 	}
-	if max < 1 {
-		return 1
-	}
-	return max
-}
 
-// stdinHasData returns true if stdin is piped or redirected.
-func stdinHasData() bool {
-	info, err := os.Stdin.Stat()
-	if err != nil {
-		return false
+	var output strings.Builder
+
+	// Print thinking if present
+	if result.Thinking != nil && result.Thinking.Content != "" {
+		printer.Print("thinking", result.Thinking.Content)
+		output.WriteString(result.Thinking.Content)
 	}
-	return (info.Mode() & os.ModeCharDevice) == 0
+
+	// Print main message, checking for embedded thinking tags
+	content := result.Message.Content
+	if !parseAndPrintThinkingBlocks(printer, content) {
+		// No thinking tags found, print as-is
+		printer.Print("assistant", content)
+	}
+	output.WriteString(content)
+
+	return output.String()
 }
