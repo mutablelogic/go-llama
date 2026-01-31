@@ -4,7 +4,6 @@ import (
 	"context"
 
 	// Packages
-
 	schema "github.com/mutablelogic/go-llama/pkg/llamacpp/schema"
 	llamacpp "github.com/mutablelogic/go-llama/sys/llamacpp"
 )

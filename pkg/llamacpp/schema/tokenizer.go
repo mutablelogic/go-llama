@@ -1,9 +1,7 @@
 package schema
 
-import (
-	// Packages
-	llamacpp "github.com/mutablelogic/go-llama/sys/llamacpp"
-)
+// Token is a token ID (type alias for int32)
+type Token = int32
 
 ///////////////////////////////////////////////////////////////////////////////
 // TYPES
@@ -18,15 +16,15 @@ type TokenizeRequest struct {
 
 // TokenizeResponse contains the result of tokenization.
 type TokenizeResponse struct {
-	Tokens []llamacpp.Token `json:"tokens"`
+	Tokens []Token `json:"tokens"`
 }
 
 // DetokenizeRequest contains parameters for detokenizing tokens.
 type DetokenizeRequest struct {
-	Model          string           `json:"model"`                     // Model name or path (must be loaded)
-	Tokens         []llamacpp.Token `json:"tokens"`                    // Tokens to detokenize
-	RemoveSpecial  *bool            `json:"remove_special,omitempty"`  // Remove BOS/EOS tokens (default: false)
-	UnparseSpecial *bool            `json:"unparse_special,omitempty"` // Render special tokens as text (default: true)
+	Model          string  `json:"model"`                     // Model name or path (must be loaded)
+	Tokens         []Token `json:"tokens"`                    // Tokens to detokenize
+	RemoveSpecial  *bool   `json:"remove_special,omitempty"`  // Remove BOS/EOS tokens (default: false)
+	UnparseSpecial *bool   `json:"unparse_special,omitempty"` // Render special tokens as text (default: true)
 }
 
 // DetokenizeResponse contains the result of detokenization.
