@@ -29,7 +29,6 @@ RUN make clean \
     && GGML_VULKAN=1 \
     GGML_NATIVE=OFF \
     CMAKE_BUILD_PARALLEL_LEVEL=1 \
-    MAKEFLAGS=-j1 \
     BUILD_JOBS=${BUILD_JOBS} \
     make gollama
 
