@@ -28,6 +28,9 @@ type opt struct {
 	Stop          []string
 	PrefixCache   *bool
 
+	// Chat options
+	System *string
+
 	// Embedding options
 	Normalize *bool
 
@@ -185,6 +188,14 @@ func WithStop(stop ...string) Opt {
 func WithPrefixCache(prefixCache bool) Opt {
 	return func(o *opt) error {
 		o.PrefixCache = &prefixCache
+		return nil
+	}
+}
+
+// WithSystem sets the system message/prompt for chat requests.
+func WithSystem(system string) Opt {
+	return func(o *opt) error {
+		o.System = &system
 		return nil
 	}
 }

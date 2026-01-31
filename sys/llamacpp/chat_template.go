@@ -51,12 +51,6 @@ func (m *Model) HasChatTemplate() bool {
 ///////////////////////////////////////////////////////////////////////////////
 // APPLY CHAT TEMPLATE
 
-// ApplyTemplate formats messages using the model's chat template
-// If addAssistant is true, adds the assistant turn prefix at the end
-func (m *Model) ApplyTemplate(messages []ChatMessage, addAssistant bool) (string, error) {
-	return ApplyTemplateWithModel(m, "", messages, addAssistant)
-}
-
 // ApplyTemplateWithModel formats messages using a specific template
 // If tmpl is empty, uses the model's default template
 // If model is nil, tmpl must be provided

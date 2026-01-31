@@ -57,6 +57,7 @@ type CLI struct {
 	Globals
 	ModelCommands
 	CompletionCommands
+	ChatCommands
 	EmbedCommands
 	TokenizerCommands
 	ServerCommands
