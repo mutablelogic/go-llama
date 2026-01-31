@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	// Packages
+	"github.com/mutablelogic/go-client"
 	otel "github.com/mutablelogic/go-client/pkg/otel"
 	schema "github.com/mutablelogic/go-llama/pkg/llamacpp/schema"
 	store "github.com/mutablelogic/go-llama/pkg/llamacpp/store"
@@ -53,7 +54,7 @@ func New(path string, opts ...Opt) (*Llama, error) {
 	}
 
 	// Create a model store
-	if store, err := store.New(path); err != nil {
+	if store, err := store.New(path, client.OptTracer(instance.tracer)); err != nil {
 		return nil, err
 	} else {
 		instance.Store = store

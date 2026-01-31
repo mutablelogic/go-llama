@@ -16,8 +16,20 @@
 //	// Get a specific model
 //	model, err := client.GetModel(ctx, "llama-7b")
 //
+//	// Download a model from URL with progress
+//	model, err := client.PullModel(ctx, "hf://microsoft/DialoGPT-medium",
+//	    httpclient.WithProgressCallback(func(filename string, received, total uint64) error {
+//	        if total > 0 {
+//	            pct := float64(received) * 100.0 / float64(total)
+//	            fmt.Printf("Downloading %s: %.1f%%\n", filename, pct)
+//	        }
+//	        return nil
+//	    }))
+//
 //	// Load a model into memory
-//	model, err := client.LoadModel(ctx, "llama-7b")
+//	model, err := client.LoadModel(ctx, "llama-7b",
+//	    httpclient.WithGpu(0),
+//	    httpclient.WithLayers(32))
 //
 //	// Unload a model from memory
 //	err := client.UnloadModel(ctx, "llama-7b")

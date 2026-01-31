@@ -36,7 +36,8 @@ type opt struct {
 	UnparseSpecial *bool
 
 	// Streaming callback
-	chunkCallback func(*schema.CompletionChunk) error
+	chunkCallback    func(*schema.CompletionChunk) error
+	progressCallback func(filename string, bytesReceived, totalBytes uint64) error
 }
 
 // Opt is an option to set on the client request.
@@ -169,6 +170,15 @@ func WithPrefixCache(prefixCache bool) Opt {
 func WithChunkCallback(callback func(*schema.CompletionChunk) error) Opt {
 	return func(o *opt) error {
 		o.chunkCallback = callback
+		return nil
+	}
+}
+
+// WithProgressCallback sets a callback function to receive progress updates.
+// This enables streaming support for model pull operations.
+func WithProgressCallback(callback func(filename string, bytesReceived, totalBytes uint64) error) Opt {
+	return func(o *opt) error {
+		o.progressCallback = callback
 		return nil
 	}
 }

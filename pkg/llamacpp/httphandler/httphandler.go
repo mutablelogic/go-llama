@@ -63,10 +63,12 @@ func httperr(err error) error {
 	switch {
 	case errors.Is(err, llama.ErrNotFound):
 		return httpresponse.ErrNotFound.With(err.Error())
+	case errors.Is(err, llama.ErrModelNotLoaded):
+		// Model exists but not loaded - this is a conflict, not a bad request
+		return httpresponse.ErrConflict.With(err.Error())
 	case errors.Is(err, llama.ErrInvalidArgument),
 		errors.Is(err, llama.ErrInvalidModel),
 		errors.Is(err, llama.ErrInvalidContext),
-		errors.Is(err, llama.ErrModelNotLoaded),
 		errors.Is(err, llama.ErrInvalidToken),
 		errors.Is(err, llama.ErrInvalidBatch),
 		errors.Is(err, llama.ErrBatchFull),

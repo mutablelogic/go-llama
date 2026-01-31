@@ -54,7 +54,7 @@ type Globals struct {
 
 type CLI struct {
 	Globals
-	GpuInfo GpuInfoCmd `cmd:"gpuinfo" help:"Show GPU information"`
+	GpuInfo GpuInfoCmd `cmd:"" name:"gpuinfo" help:"Show GPU information"`
 	ModelCommands
 	CompletionCommands
 	EmbedCommands

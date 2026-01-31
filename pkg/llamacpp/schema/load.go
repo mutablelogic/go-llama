@@ -20,6 +20,11 @@ type LoadModelRequest struct {
 	Mlock  *bool  `json:"use_mlock,omitempty"`  // Lock model in memory (nil = default)
 }
 
+// PullModelRequest contains the parameters for downloading a model from a URL.
+type PullModelRequest struct {
+	URL string `json:"url"` // URL to download the model from (supports hf:// and https://)
+}
+
 // CachedModel represents a model that has been loaded into memory.
 // The embedded RWMutex provides thread-safety for operations on this model.
 type CachedModel struct {
@@ -46,6 +51,10 @@ type ContextRequest struct {
 // STRINGIFY
 
 func (r LoadModelRequest) String() string {
+	return stringify(r)
+}
+
+func (r PullModelRequest) String() string {
 	return stringify(r)
 }
 

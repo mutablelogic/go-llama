@@ -14,14 +14,20 @@ import (
 type ModelCommands struct {
 	ListModels  ListModelsCommand  `cmd:"" name:"models" help:"List models." group:"MODEL"`
 	GetModel    GetModelCommand    `cmd:"" name:"model" help:"Get model." group:"MODEL"`
-	LoadModel   LoadModelCommand   `cmd:"" name:"load-model" help:"Load model into memory." group:"MODEL"`
-	UnloadModel UnloadModelCommand `cmd:"" name:"unload-model" help:"Unload model from memory." group:"MODEL"`
+	PullModel   PullModelCommand   `cmd:"" name:"pull" help:"Download a model from URL." group:"MODEL"`
+	LoadModel   LoadModelCommand   `cmd:"" name:"load" help:"Load model into memory." group:"MODEL"`
+	UnloadModel UnloadModelCommand `cmd:"" name:"unload" help:"Unload model from memory." group:"MODEL"`
 }
 
 type ListModelsCommand struct{}
 
 type GetModelCommand struct {
 	ID string `arg:"" name:"id" help:"Model ID or path"`
+}
+
+type PullModelCommand struct {
+	URL      string `arg:"" name:"url" help:"Model URL (supports hf:// and https://)"`
+	Progress bool   `name:"progress" help:"Show download progress" default:"true"`
 }
 
 type LoadModelCommand struct {
@@ -59,6 +65,45 @@ func (cmd *ListModelsCommand) Run(ctx *Globals) (err error) {
 	for _, model := range models {
 		fmt.Println(model)
 	}
+	return nil
+}
+
+func (cmd *PullModelCommand) Run(ctx *Globals) (err error) {
+	client, err := ctx.Client()
+	if err != nil {
+		return err
+	}
+
+	// OTEL
+	parent, endSpan := otel.StartSpan(ctx.tracer, ctx.ctx, "PullModelCommand")
+	defer func() { endSpan(err) }()
+
+	// Build options
+	opts := []httpclient.Opt{}
+	if cmd.Progress {
+		opts = append(opts, httpclient.WithProgressCallback(func(filename string, received, total uint64) error {
+			if total > 0 {
+				pct := float64(received) * 100.0 / float64(total)
+				fmt.Printf("\rDownloading %s: %.1f%% (%d/%d bytes)", filename, pct, received, total)
+			} else {
+				fmt.Printf("\rDownloading %s: %d bytes", filename, received)
+			}
+			return nil
+		}))
+	}
+
+	// Pull model
+	model, err := client.PullModel(parent, cmd.URL, opts...)
+	if err != nil {
+		return err
+	}
+
+	// Clear progress line and print result
+	if cmd.Progress {
+		fmt.Printf("\n")
+	}
+	fmt.Println("Model downloaded successfully:")
+	fmt.Println(model)
 	return nil
 }
 

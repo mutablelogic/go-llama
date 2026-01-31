@@ -8,12 +8,16 @@ import (
 	// Packages
 	otel "github.com/mutablelogic/go-client/pkg/otel"
 	schema "github.com/mutablelogic/go-llama/pkg/llamacpp/schema"
+	store "github.com/mutablelogic/go-llama/pkg/llamacpp/store"
 	llamacpp "github.com/mutablelogic/go-llama/sys/llamacpp"
-	"go.opentelemetry.io/otel/attribute"
+	attribute "go.opentelemetry.io/otel/attribute"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
+
+// PullCallback defines the callback function signature for progress updates during model downloads
+type PullCallback func(filename string, bytes_received uint64, total_bytes uint64)
 
 // LoadModel loads a model into memory with the given parameters.
 // Returns a CachedModel with the model handle and load timestamp.
@@ -105,7 +109,7 @@ func (l *Llama) ListModels(ctx context.Context) (result []*schema.CachedModel, e
 // If not loaded, returns a CachedModel with zero timestamp and nil Handle.
 func (l *Llama) GetModel(ctx context.Context, name string) (result *schema.CachedModel, err error) {
 	ctx, endSpan := otel.StartSpan(l.tracer, ctx, schema.SpanName("GetModel"),
-		attribute.String("model.name", name),
+		attribute.String("request", name),
 	)
 	defer func() { endSpan(err) }()
 
@@ -133,7 +137,7 @@ func (l *Llama) GetModel(ctx context.Context, name string) (result *schema.Cache
 // Returns the model (now uncached with zero timestamp) and any error.
 func (l *Llama) UnloadModel(ctx context.Context, name string) (result *schema.CachedModel, err error) {
 	ctx, endSpan := otel.StartSpan(l.tracer, ctx, schema.SpanName("UnloadModel"),
-		attribute.String("model.name", name),
+		attribute.String("request", name),
 	)
 	defer func() { endSpan(err) }()
 
@@ -164,6 +168,25 @@ func (l *Llama) UnloadModel(ctx context.Context, name string) (result *schema.Ca
 	delete(l.cached, model.Path)
 
 	// Return uncached model (zero timestamp, nil handle)
+	return &schema.CachedModel{
+		Model: *model,
+	}, nil
+}
+
+// PullModel downloads a model from the given URL and returns the cached model.
+func (l *Llama) PullModel(ctx context.Context, req schema.PullModelRequest, fn PullCallback) (result *schema.CachedModel, err error) {
+	ctx, endSpan := otel.StartSpan(l.tracer, ctx, schema.SpanName("PullModel"),
+		attribute.String("request", req.String()),
+	)
+	defer func() { endSpan(err) }()
+
+	// Download the model using the store
+	model, err := l.Store.PullModel(ctx, req.URL, store.ClientCallback(fn))
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the cached model
 	return &schema.CachedModel{
 		Model: *model,
 	}, nil

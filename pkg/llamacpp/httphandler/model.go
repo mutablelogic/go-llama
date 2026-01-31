@@ -8,6 +8,7 @@ import (
 	schema "github.com/mutablelogic/go-llama/pkg/llamacpp/schema"
 	httprequest "github.com/mutablelogic/go-server/pkg/httprequest"
 	httpresponse "github.com/mutablelogic/go-server/pkg/httpresponse"
+	types "github.com/mutablelogic/go-server/pkg/types"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -16,24 +17,27 @@ import (
 // RegisterModelHandlers registers HTTP handlers for Model operations
 func RegisterModelHandlers(router *http.ServeMux, prefix string, llamaInstance *llamacpp.Llama, middleware HTTPMiddlewareFuncs) {
 	// GET /model - list all models
-	// POST /model - load a model
+	// POST /model - pull (download) a model from URL
 	router.HandleFunc(joinPath(prefix, "model"), middleware.Wrap(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			_ = modelList(w, r, llamaInstance)
 		case http.MethodPost:
-			_ = modelLoad(w, r, llamaInstance)
+			_ = modelPull(w, r, llamaInstance)
 		default:
 			_ = httpresponse.Error(w, httpresponse.Err(http.StatusMethodNotAllowed), r.Method)
 		}
 	}))
 
 	// GET /model/{id} - get a specific model
+	// POST /model/{name} - load a model by name
 	// DELETE /model/{id} - unload a specific model
 	router.HandleFunc(joinPath(prefix, "model/{id}"), middleware.Wrap(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			_ = modelGet(w, r, llamaInstance)
+		case http.MethodPost:
+			_ = modelLoad(w, r, llamaInstance)
 		case http.MethodDelete:
 			_ = modelUnload(w, r, llamaInstance)
 		default:
@@ -68,15 +72,90 @@ func modelGet(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Ll
 	return httpresponse.JSON(w, http.StatusOK, httprequest.Indent(r), model)
 }
 
-// modelLoad handles POST /model requests to load a specific model
-func modelLoad(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
-	var req schema.LoadModelRequest
+// modelPull handles POST /model requests to download a model from URL
+func modelPull(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
+	var req schema.PullModelRequest
 	if err := httprequest.Read(r, &req); err != nil {
 		return httpresponse.Error(w, httpresponse.ErrBadRequest.With(err.Error()))
 	}
 
-	if req.Name == "" {
+	if req.URL == "" {
+		return httpresponse.Error(w, httpresponse.ErrBadRequest.With("model URL is required"))
+	}
+
+	// Check Accept header for streaming progress
+	var stream *httpresponse.TextStream
+	if accept := r.Header.Get("Accept"); accept != "" {
+		mimetype, err := types.ParseContentType(accept)
+		if err != nil {
+			return httpresponse.Error(w, httpresponse.ErrBadRequest.With("invalid Accept header"), err.Error())
+		}
+		if mimetype == types.ContentTypeTextStream {
+			stream = httpresponse.NewTextStream(w)
+			if stream == nil {
+				return httpresponse.Error(w, httpresponse.ErrInternalError.With("cannot create text stream"))
+			}
+			defer stream.Close()
+		}
+	}
+
+	// Stream progress updates using TextStream
+	var progressCallback llamacpp.PullCallback
+	if stream != nil {
+		progressCallback = func(filename string, bytesReceived, totalBytes uint64) {
+			var percentage float64
+			if totalBytes > 0 {
+				percentage = float64(bytesReceived) * 100.0 / float64(totalBytes)
+			}
+			stream.Write(schema.ModelPullProgressType, schema.ModelPullProgress{
+				Filename:      filename,
+				BytesReceived: bytesReceived,
+				TotalBytes:    totalBytes,
+				Percentage:    percentage,
+			})
+		}
+	}
+
+	// Perform the model pull
+	model, err := llamaInstance.PullModel(r.Context(), req, progressCallback)
+	if err != nil {
+		if stream != nil {
+			// Send error via TextStream
+			stream.Write(schema.ModelPullErrorType, map[string]string{"error": err.Error()})
+			return nil
+		}
+		return httpresponse.Error(w, httperr(err))
+	}
+
+	if stream != nil {
+		// Send completion event via TextStream
+		stream.Write(schema.ModelPullCompleteType, model)
+		return nil
+	}
+
+	// Return success
+	return httpresponse.JSON(w, http.StatusCreated, httprequest.Indent(r), model)
+}
+
+// modelLoad handles POST /model/{name} requests to load a specific model by name
+func modelLoad(w http.ResponseWriter, r *http.Request, llamaInstance *llamacpp.Llama) error {
+	name := r.PathValue("id") // Using "id" path parameter for the model name
+	if name == "" {
 		return httpresponse.Error(w, httpresponse.ErrBadRequest.With("model name is required"))
+	}
+
+	// Create LoadModelRequest with the name from URL path
+	req := schema.LoadModelRequest{
+		Name: name,
+	}
+
+	// Read any additional options from request body (optional)
+	if r.ContentLength > 0 {
+		if err := httprequest.Read(r, &req); err != nil {
+			return httpresponse.Error(w, httpresponse.ErrBadRequest.With(err.Error()))
+		}
+		// Ensure the name from URL takes precedence
+		req.Name = name
 	}
 
 	model, err := llamaInstance.LoadModel(r.Context(), req)
