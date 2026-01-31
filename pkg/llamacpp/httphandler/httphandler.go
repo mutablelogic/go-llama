@@ -24,6 +24,7 @@ type HTTPMiddlewareFuncs []func(http.HandlerFunc) http.HandlerFunc
 func RegisterHandlers(router *http.ServeMux, prefix string, llamaInstance *llamacpp.Llama, middleware HTTPMiddlewareFuncs) {
 	RegisterModelHandlers(router, prefix, llamaInstance, middleware)
 	RegisterCompletionHandlers(router, prefix, llamaInstance, middleware)
+	RegisterChatHandlers(router, prefix, llamaInstance, middleware)
 	RegisterEmbedHandlers(router, prefix, llamaInstance, middleware)
 	RegisterTokenizerHandlers(router, prefix, llamaInstance, middleware)
 }

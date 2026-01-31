@@ -157,7 +157,7 @@ func TestModelApplyTemplate(t *testing.T) {
 		{Role: "user", Content: "Hello!"},
 	}
 
-	result, err := model.ApplyTemplate(messages, true)
+	result, err := llamacpp.ApplyTemplateWithModel(model, "", messages, true)
 	if err != nil {
 		t.Fatalf("failed to apply model template: %v", err)
 	}

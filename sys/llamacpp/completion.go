@@ -442,7 +442,7 @@ func (ctx *Context) CompleteWithMessages(messages []ChatMessage, opts Completion
 	}
 
 	// Apply chat template
-	prompt, err := ctx.model.ApplyTemplate(messages, true)
+	prompt, err := ApplyTemplateWithModel(ctx.model, "", messages, true)
 	if err != nil {
 		return "", err
 	}
