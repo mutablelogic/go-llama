@@ -11,9 +11,9 @@ import (
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
-func VersionJSON(ctx *Globals) string {
+func VersionJSON(execName string) string {
 	metadata := map[string]string{
-		"name":       ctx.execName,
+		"name":       execName,
 		"compiler":   runtime.Version(),
 		"source":     version.GitSource,
 		"tag":        version.GitTag,

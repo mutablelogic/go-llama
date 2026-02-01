@@ -80,7 +80,7 @@ func main() {
 		kong.Name(execName),
 		kong.Description("go-llama command line interface"),
 		kong.Vars{
-			"version":         VersionJSON(),
+			"version":         VersionJSON(execName),
 			"EXECUTABLE_NAME": execName,
 		},
 		kong.UsageOnError(),

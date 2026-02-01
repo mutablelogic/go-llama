@@ -18,6 +18,7 @@ import (
 	pkg "github.com/mutablelogic/go-llama/pkg/llamacpp"
 	httphandler "github.com/mutablelogic/go-llama/pkg/llamacpp/httphandler"
 	version "github.com/mutablelogic/go-llama/pkg/version"
+	"github.com/mutablelogic/go-server/pkg/httpresponse"
 	httpserver "github.com/mutablelogic/go-server/pkg/httpserver"
 )
 
@@ -98,11 +99,16 @@ func (cmd *RunServer) Run(ctx *Globals) error {
 	}
 	httphandler.RegisterHandlers(router, prefix, manager, middleware)
 
-	// Add a root handler that returns the version
+	// Ping handler - no middleware
 	router.HandleFunc(prefix, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(VersionJSON(ctx)))
+		_, _ = w.Write([]byte(VersionJSON(ctx.execName)))
+	})
+
+	// Add 404 handler - no middleware
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		httpresponse.Error(w, httpresponse.ErrNotFound, r.RequestURI)
 	})
 
 	// Create a TLS config
