@@ -26,10 +26,11 @@ go.work.sum
 
 # Editor/IDE
 .vscode/
+.claude
 
 # Build artifacts
 build/
 
 # Other
-/gollama
+/go-llama
 .DS*

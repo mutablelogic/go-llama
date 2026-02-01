@@ -143,9 +143,8 @@ func modelLoadUnload(w http.ResponseWriter, r *http.Request, llamaInstance *llam
 	var req schema.LoadModelRequest
 	if err := httprequest.Read(r, &req); err != nil {
 		return httpresponse.Error(w, httpresponse.ErrBadRequest.With(err.Error()))
-	} else {
-		req.Name = r.PathValue("id")
 	}
+	req.Name = r.PathValue("id")
 
 	// Check if this is an unload request
 	isUnload := req.Load != nil && !*req.Load

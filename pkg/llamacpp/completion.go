@@ -34,13 +34,21 @@ func (l *Llama) Complete(ctx context.Context, req schema.CompletionRequest, onCh
 
 		opts := buildCompletionOptions(ctx, req)
 		var callbackErr error
+		var stopFilter *stopMarkerFilter
 		if onChunk != nil {
+			stopFilter = newStopMarkerFilter(opts.StopWords)
 			opts.OnToken = func(token string) bool {
 				if callbackErr != nil {
 					return false
 				}
-				if err := onChunk(schema.CompletionChunk{Text: token}); err != nil {
-					callbackErr = err
+				filtered, stopped := stopFilter.Process(token)
+				if filtered != "" {
+					if err := onChunk(schema.CompletionChunk{Text: filtered}); err != nil {
+						callbackErr = err
+						return false
+					}
+				}
+				if stopped {
 					return false
 				}
 				return true
@@ -54,6 +62,18 @@ func (l *Llama) Complete(ctx context.Context, req schema.CompletionRequest, onCh
 		if callbackErr != nil {
 			return callbackErr
 		}
+
+		// Flush any buffered content if we didn't hit a stop
+		if onChunk != nil && stopFilter != nil && !stopFilter.Stopped() {
+			if tail := stopFilter.Flush(); tail != "" {
+				if err := onChunk(schema.CompletionChunk{Text: tail}); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Trim stop sequences from final text
+		text, _ = trimAtStop(text, opts.StopWords)
 
 		usage, err := completionUsage(task.Model(), req.Prompt, text)
 		if err != nil {
