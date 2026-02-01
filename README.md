@@ -5,7 +5,7 @@
 
 Go bindings and a unified server/CLI for [llama.cpp](https://github.com/ggerganov/llama.cpp).
 
-Run a local LLM server with a REST API, manage GGUF models, and use the `gollama` CLI for chat, completion, embeddings, and tokenization.
+Run a local LLM server with a REST API, manage GGUF models, and use the `go-llama` CLI for chat, completion, embeddings, and tokenization.
 
 ## Features
 
@@ -30,9 +30,9 @@ Some work still to do on the chat endpoint. The following are not yet included, 
 Start the server with Docker:
 
 ~~~bash
-docker volume create gollama
-docker run -d --name gollama \
-  -v gollama:/data -p 8083:8083 \
+docker volume create go-llama
+docker run -d --name go-llama \
+  -v go-llama:/data -p 8083:8083 \
   ghcr.io/mutablelogic/go-llama run
 ~~~
 
@@ -42,29 +42,28 @@ Then use the CLI to interact with the server:
 export GOLLAMA_ADDR="localhost:8083"
 
 # Pull a model (Hugging Face URL or hf:// scheme)
-gollama pull hf://bartowski/Llama-3.2-1B-Instruct-GGUF/Llama-3.2-1B-Instruct-Q4_K_M.gguf
+go-llama pull hf://bartowski/Llama-3.2-1B-Instruct-GGUF/Llama-3.2-1B-Instruct-Q4_K_M.gguf
 
 # List models
-gollama models
+go-llama models
 
 # Load a model into memory
-gollama load Llama-3.2-1B-Instruct-Q4_K_M.gguf
+go-llama load Llama-3.2-1B-Instruct-Q4_K_M.gguf
 
 # Chat (interactive)
-gollama chat Llama-3.2-1B-Instruct-Q4_K_M.gguf "You are a helpful assistant"
-
+go-llama chat Llama-3.2-1B-Instruct-Q4_K_M.gguf "You are a helpful assistant"
 # Completion
-gollama complete Llama-3.2-1B-Instruct-Q4_K_M.gguf "Explain KV cache in two sentences"
+go-llama complete Llama-3.2-1B-Instruct-Q4_K_M.gguf "Explain KV cache in two sentences"
 ~~~
 
 ## Model Support
 
-`gollama` works with GGUF models supported by llama.cpp. Models can be pulled from Hugging Face using:
+`go-llama` works with GGUF models supported by llama.cpp. Models can be pulled from Hugging Face using:
 
 - `https://huggingface.co/<org>/<repo>/blob/<branch>/<file>.gguf`
 - `hf://<org>/<repo>/<file>.gguf`
 
-The default model cache directory is `${XDG_CACHE_HOME}/gollama` (or system temp) and can be overridden with `GOLLAMA_DIR`.
+The default model cache directory is `${XDG_CACHE_HOME}/go-llama` (or system temp) and can be overridden with `GOLLAMA_DIR`.
 
 ## Docker Deployment
 
@@ -118,10 +117,10 @@ Use `go-llama --help` or `go-llama <command> --help` for full options. Server co
 
 ~~~bash
 # Build server binary
-make gollama
+make go-llama
 
 # Build client-only binary
-make gollama-client
+make go-llama-client
 
 # Build Docker images
 make docker
