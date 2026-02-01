@@ -281,25 +281,23 @@ var defaultStopSequences = []string{
 
 type stopMarkerFilter struct {
 	stops   []string
-	maxLen  int
 	buffer  string
 	stopped bool
 }
 
 func newStopMarkerFilter(stops []string) *stopMarkerFilter {
-	maxLen := 0
-	for _, s := range stops {
-		if len(s) > maxLen {
-			maxLen = len(s)
-		}
-	}
-	return &stopMarkerFilter{stops: stops, maxLen: maxLen}
+	return &stopMarkerFilter{stops: stops}
 }
 
 func (f *stopMarkerFilter) Stopped() bool {
 	return f.stopped
 }
 
+// Process handles incoming tokens using llama.cpp's two-phase approach:
+// 1. Check for full stop sequences
+// 2. If no full stop, check if text ends with a prefix of any stop word (partial match)
+//
+// Returns the text safe to send and whether generation should stop.
 func (f *stopMarkerFilter) Process(text string) (string, bool) {
 	if f.stopped {
 		return "", true
@@ -309,25 +307,28 @@ func (f *stopMarkerFilter) Process(text string) (string, bool) {
 	}
 
 	combined := f.buffer + text
-	idx, found := indexAnyStop(combined, f.stops)
-	if found {
+
+	// Phase 1: Check for full stop sequence
+	if idx, found := indexAnyStop(combined, f.stops); found {
 		f.stopped = true
+		f.buffer = ""
 		return combined[:idx], true
 	}
 
-	if f.maxLen <= 1 {
-		f.buffer = ""
-		return combined, false
+	// Phase 2: Check if text ends with a partial stop sequence
+	// If so, withhold the partial match in the buffer
+	if partialPos := findPartialStop(combined, f.stops); partialPos != -1 {
+		// Text ends with a prefix of a stop word - withhold from partialPos onward
+		f.buffer = combined[partialPos:]
+		if partialPos == 0 {
+			return "", false
+		}
+		return combined[:partialPos], false
 	}
-	keep := f.maxLen - 1
-	if len(combined) <= keep {
-		f.buffer = combined
-		return "", false
-	}
-	cut := len(combined) - keep
-	out := combined[:cut]
-	f.buffer = combined[cut:]
-	return out, false
+
+	// No full or partial match - safe to send everything
+	f.buffer = ""
+	return combined, false
 }
 
 func (f *stopMarkerFilter) Flush() string {
@@ -337,6 +338,49 @@ func (f *stopMarkerFilter) Flush() string {
 	out := f.buffer
 	f.buffer = ""
 	return out
+}
+
+// findPartialStop checks if s ends with a prefix of any stop word.
+// Returns the position where the partial match starts, or -1 if no partial match.
+// This mirrors llama.cpp's string_find_partial_stop function.
+func findPartialStop(s string, stops []string) int {
+	if len(s) == 0 {
+		return -1
+	}
+
+	lastChar := s[len(s)-1]
+
+	for _, stop := range stops {
+		if len(stop) == 0 {
+			continue
+		}
+
+		// Check each possible prefix of the stop word, starting from longest.
+	maxPrefixLen := 0
+
+	for _, stop := range stops {
+		if len(stop) == 0 {
+			continue
+		}
+
+		// Check each possible prefix of the stop word, starting from longest.
+		// We look for prefixes that end with the last character of s.
+		for prefixLen := len(stop); prefixLen >= 1; prefixLen-- {
+			if stop[prefixLen-1] != lastChar {
+				continue
+			}
+
+			prefix := stop[:prefixLen]
+			if strings.HasSuffix(s, prefix) && prefixLen > maxPrefixLen {
+				maxPrefixLen = prefixLen
+			}
+		}
+	}
+
+	if maxPrefixLen > 0 {
+		return len(s) - maxPrefixLen
+	}
+	return -1
 }
 
 func indexAnyStop(s string, stops []string) (int, bool) {

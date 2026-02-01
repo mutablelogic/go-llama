@@ -235,7 +235,8 @@ func TestModelLoad_NonExistentModel(t *testing.T) {
 	router := http.NewServeMux()
 	RegisterModelHandlers(router, "/api", llama, noopMiddleware())
 
-	req := httptest.NewRequest(http.MethodPost, "/api/model/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/model/nonexistent", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
 	rw := httptest.NewRecorder()
 
 	router.ServeHTTP(rw, req)
