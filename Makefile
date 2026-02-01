@@ -71,15 +71,15 @@ endif
 #####################################################################
 # BUILD
 
-# Make gollama (includes server run command)
-gollama: wrapper
-	@echo "Building gollama"
-	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig CGO_LDFLAGS_ALLOW="-(W|D).*" ${GO} build ${BUILD_FLAGS} -o ${BUILD_DIR}/gollama ./cmd/gollama
+# Make go-llama (includes server run command)
+go-llama: wrapper
+	@echo "Building go-llama"
+	@PKG_CONFIG_PATH=$(shell realpath ${PREFIX})/lib/pkgconfig CGO_LDFLAGS_ALLOW="-(W|D).*" ${GO} build ${BUILD_FLAGS} -o ${BUILD_DIR}/go-llama ./cmd/go-llama
 
-# Make gollama-client (no server run command)
-gollama-client:
-	@echo "Building gollama-client"
-	@${GO} build ${BUILD_FLAGS} -tags client -o ${BUILD_DIR}/gollama ./cmd/gollama
+# Make go-llama-client (no server run command)
+go-llama-client:
+	@echo "Building go-llama-client"
+	@${GO} build ${BUILD_FLAGS} -tags client -o ${BUILD_DIR}/go-llama ./cmd/go-llama
 
 #####################################################################
 # BUILD STATIC LIBRARIES

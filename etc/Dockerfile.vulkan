@@ -24,13 +24,8 @@ ENV PATH=$PATH:/usr/local/go/bin
 WORKDIR /app
 COPY . .
 
-# Make gollama with Vulkan support (disable native CPU optimizations for portability)
-RUN make clean \
-    && GGML_VULKAN=1 \
-    GGML_NATIVE=OFF \
-    CMAKE_BUILD_PARALLEL_LEVEL=1 \
-    BUILD_JOBS=${BUILD_JOBS} \
-    make gollama
+# Make go-llama with Vulkan support (disable native CPU optimizations for portability)
+RUN make clean && GGML_VULKAN=1 GGML_NATIVE=OFF CMAKE_BUILD_PARALLEL_LEVEL=1 BUILD_JOBS=${BUILD_JOBS} make go-llama
 
 # Setup runtime container
 FROM ${BASE_RUN_CONTAINER} AS runtime
@@ -38,13 +33,13 @@ RUN apt -y update \
     && apt install -y ca-certificates libgomp1 \
     && apt install -y libvulkan1 libshaderc1 libplacebo349 vulkan-tools mesa-vulkan-drivers
 
-# Copy built gollama binary
-COPY --from=build --chmod=755 /app/build/gollama /usr/local/bin/gollama
+# Copy built go-llama binary
+COPY --from=build --chmod=755 /app/build/go-llama /usr/local/bin/go-llama
 
 # Container environment
 ENV GOLLAMA_DIR="/data"
 ENV GOLLAMA_ADDR="0.0.0.0:8081"
 VOLUME [ "/data" ]
-ENTRYPOINT [ "/usr/local/bin/gollama" ]
+ENTRYPOINT [ "/usr/local/bin/go-llama" ]
 STOPSIGNAL SIGQUIT
 EXPOSE 8081

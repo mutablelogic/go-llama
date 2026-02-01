@@ -47,10 +47,11 @@ type Globals struct {
 	} `embed:"" prefix:"otel."`
 
 	// Private fields
-	ctx    context.Context
-	cancel context.CancelFunc
-	logger server.Logger
-	tracer trace.Tracer
+	ctx      context.Context
+	cancel   context.CancelFunc
+	logger   server.Logger
+	tracer   trace.Tracer
+	execName string
 }
 
 type CLI struct {
@@ -68,7 +69,7 @@ type CLI struct {
 
 func main() {
 	// Get executable name
-	execName := "gollama"
+	execName := "go-llama"
 	if exe, err := os.Executable(); err == nil {
 		execName = filepath.Base(exe)
 	}
@@ -77,9 +78,9 @@ func main() {
 	cli := new(CLI)
 	ctx := kong.Parse(cli,
 		kong.Name(execName),
-		kong.Description("gollama command line interface"),
+		kong.Description("go-llama command line interface"),
 		kong.Vars{
-			"version":         VersionJSON(),
+			"version":         VersionJSON(execName),
 			"EXECUTABLE_NAME": execName,
 		},
 		kong.UsageOnError(),
@@ -87,6 +88,9 @@ func main() {
 			Compact: true,
 		}),
 	)
+
+	// Set the executable name
+	cli.Globals.execName = execName
 
 	// Run the command
 	os.Exit(run(ctx, &cli.Globals))
@@ -132,7 +136,7 @@ func run(ctx *kong.Context, globals *Globals) int {
 // PRIVATE METHODS
 
 func (g *Globals) Client() (*httpclient.Client, error) {
-	endpoint, opts, err := g.clientEndpoint("gollama")
+	endpoint, opts, err := g.clientEndpoint(g.execName)
 	if err != nil {
 		return nil, err
 	}

@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"runtime"
 
 	// Packages
@@ -13,15 +11,9 @@ import (
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
-func VersionJSON() string {
-	// Get executable name
-	name := "gollama"
-	if exe, err := os.Executable(); err == nil {
-		name = filepath.Base(exe)
-	}
-
+func VersionJSON(execName string) string {
 	metadata := map[string]string{
-		"name":       name,
+		"name":       execName,
 		"compiler":   runtime.Version(),
 		"source":     version.GitSource,
 		"tag":        version.GitTag,

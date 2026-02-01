@@ -5,25 +5,25 @@
 
 Go bindings and a unified server/CLI for [llama.cpp](https://github.com/ggerganov/llama.cpp).
 
-Run a local LLM server with a REST API, manage GGUF models, and use the `gollama` CLI for chat, completion, embeddings, and tokenization.
+Run a local LLM server with a REST API, manage GGUF models, and use the `go-llama` CLI for chat, completion, embeddings, and tokenization.
 
 ## Features
 
 - **Command Line Interface**: Interactive chat and completion tooling
-- **HTTP API Server**: REST endpoints for chat, completion, embeddings, and model management
+- **HTTP API Server**: REST endpoints for chat, completion, embeddings, and model management (not yet OpenAI or Anthropic compatible)
 - **Model Management**: Pull, cache, load, unload, and delete GGUF models
 - **Streaming**: Incremental token streaming for chat and completion
 - **GPU Support**: CUDA, Vulkan, and Metal (macOS) acceleration via llama.cpp
-- **Docker Support**: Pre-built images for CPU, CUDA, and Vulkan targets (WIP)
+- **Docker Support**: Pre-built images for CPU, CUDA, and Vulkan targets
 
 ## Quick Start
 
 Start the server with Docker:
 
 ~~~bash
-docker volume create gollama
-docker run -d --name gollama \
-  -v gollama:/data -p 8083:8083 \
+docker volume create go-llama
+docker run -d --name go-llama \
+  -v go-llama:/data -p 8083:8083 \
   ghcr.io/mutablelogic/go-llama run
 ~~~
 
@@ -33,29 +33,28 @@ Then use the CLI to interact with the server:
 export GOLLAMA_ADDR="localhost:8083"
 
 # Pull a model (Hugging Face URL or hf:// scheme)
-gollama pull https://huggingface.co/unsloth/phi-4-GGUF/blob/main/phi-4-q4_k_m.gguf
+go-llama pull https://huggingface.co/unsloth/phi-4-GGUF/blob/main/phi-4-q4_k_m.gguf
 
 # List models
-gollama models
+go-llama models
 
 # Load a model into memory
-gollama load phi-4-q4_k_m.gguf
+go-llama load phi-4-q4_k_m.gguf
 
 # Chat (interactive)
-gollama chat phi-4-q4_k_m.gguf "You are a helpful assistant"
-
+go-llama chat phi-4-q4_k_m.gguf "You are a helpful assistant"
 # Completion
-gollama complete phi-4-q4_k_m.gguf "Explain KV cache in two sentences"
+go-llama complete phi-4-q4_k_m.gguf "Explain KV cache in two sentences"
 ~~~
 
 ## Model Support
 
-`gollama` works with GGUF models supported by llama.cpp. Models can be pulled from Hugging Face using:
+`go-llama` works with GGUF models supported by llama.cpp. Models can be pulled from Hugging Face using:
 
 - `https://huggingface.co/<org>/<repo>/blob/<branch>/<file>.gguf`
 - `hf://<org>/<repo>/<file>.gguf`
 
-The default model cache directory is `${XDG_CACHE_HOME}/gollama` (or system temp) and can be overridden with `GOLLAMA_DIR`.
+The default model cache directory is the system cache folder (e.g., `~/.cache/go-llama` on Linux, `~/Library/Caches/go-llama` on macOS) and can be overridden with `GOLLAMA_DIR` or `--models`.
 
 ## Docker Deployment
 
@@ -71,20 +70,21 @@ Use the `run` command inside the container to start the server. For GPU usage, e
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `models` | List available models | `gollama models` |
-| `model` | Get model details | `gollama model phi-4-q4_k_m.gguf` |
-| `pull` | Download a model | `gollama pull hf://org/repo/model.gguf` |
-| `load` | Load a model into memory | `gollama load phi-4-q4_k_m.gguf` |
-| `unload` | Unload a model from memory | `gollama unload phi-4-q4_k_m.gguf` |
-| `delete` | Delete a model | `gollama delete phi-4-q4_k_m.gguf` |
-| `chat` | Interactive chat | `gollama chat phi-4-q4_k_m.gguf "system"` |
-| `complete` | Text completion | `gollama complete phi-4-q4_k_m.gguf "prompt"` |
-| `embed` | Generate embeddings | `gollama embed phi-4-q4_k_m.gguf "text"` |
-| `tokenize` | Convert text to tokens | `gollama tokenize phi-4-q4_k_m.gguf "text"` |
-| `detokenize` | Convert tokens to text | `gollama detokenize phi-4-q4_k_m.gguf 1 2 3` |
-| `run` | Run the HTTP server | `gollama run --http.addr localhost:8083` |
+| `gpuinfo` | Show GPU information | `go-llama gpuinfo` |
+| `models` | List available models | `go-llama models` |
+| `model` | Get model details | `go-llama model phi-4-q4_k_m.gguf` |
+| `pull` | Download a model | `go-llama pull hf://org/repo/model.gguf` |
+| `load` | Load a model into memory | `go-llama load phi-4-q4_k_m.gguf` |
+| `unload` | Unload a model from memory | `go-llama unload phi-4-q4_k_m.gguf` |
+| `delete` | Delete a model | `go-llama delete phi-4-q4_k_m.gguf` |
+| `chat` | Interactive chat | `go-llama chat phi-4-q4_k_m.gguf "system"` |
+| `complete` | Text completion | `go-llama complete phi-4-q4_k_m.gguf "prompt"` |
+| `embed` | Generate embeddings | `go-llama embed phi-4-q4_k_m.gguf "text"` |
+| `tokenize` | Convert text to tokens | `go-llama tokenize phi-4-q4_k_m.gguf "text"` |
+| `detokenize` | Convert tokens to text | `go-llama detokenize phi-4-q4_k_m.gguf 1 2 3` |
+| `run` | Run the HTTP server | `go-llama run --http.addr localhost:8083` |
 
-Use `gollama --help` or `gollama <command> --help` for full options.
+Use `go-llama --help` or `go-llama <command> --help` for full options.
 
 ## Development
 
@@ -104,10 +104,10 @@ Use `gollama --help` or `gollama <command> --help` for full options.
 
 ~~~bash
 # Build server binary
-make gollama
+make go-llama
 
 # Build client-only binary
-make gollama-client
+make go-llama-client
 
 # Build Docker images
 make docker
