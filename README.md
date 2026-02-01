@@ -10,11 +10,11 @@ Run a local LLM server with a REST API, manage GGUF models, and use the `gollama
 ## Features
 
 - **Command Line Interface**: Interactive chat and completion tooling
-- **HTTP API Server**: REST endpoints for chat, completion, embeddings, and model management
+- **HTTP API Server**: REST endpoints for chat, completion, embeddings, and model management (not yet OpenAI or Anthropic compatible)
 - **Model Management**: Pull, cache, load, unload, and delete GGUF models
 - **Streaming**: Incremental token streaming for chat and completion
 - **GPU Support**: CUDA, Vulkan, and Metal (macOS) acceleration via llama.cpp
-- **Docker Support**: Pre-built images for CPU, CUDA, and Vulkan targets (WIP)
+- **Docker Support**: Pre-built images for CPU, CUDA, and Vulkan targets
 
 ## Quick Start
 

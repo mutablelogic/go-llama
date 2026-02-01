@@ -123,16 +123,16 @@ jobs:
             - name: Create
               run: |
                   docker manifest create ${{ needs.var.outputs.image }}:${{ matrix.tag }} \
-                    --amend ${{ needs.var.outputs.image }}-linux-amd64:${{ needs.var.outputs.tag }} \
-                    --amend ${{ needs.var.outputs.image }}-linux-arm64:${{ needs.var.outputs.tag }}
+                    --amend ${{ needs.var.outputs.image }}-vulkan-linux-amd64:${{ needs.var.outputs.tag }} \
+                    --amend ${{ needs.var.outputs.image }}-vulkan-linux-arm64:${{ needs.var.outputs.tag }}
             - name: Annotate
               run: |
                   docker manifest annotate --arch arm64 --os linux \
                     ${{ needs.var.outputs.image }}:${{ matrix.tag  }} \
-                    ${{ needs.var.outputs.image }}-linux-arm64:${{ needs.var.outputs.tag }}
+                    ${{ needs.var.outputs.image }}-vulkan-linux-arm64:${{ needs.var.outputs.tag }}
                   docker manifest annotate --arch amd64 --os linux \
                     ${{ needs.var.outputs.image }}:${{ matrix.tag  }} \
-                    ${{ needs.var.outputs.image }}-linux-amd64:${{ needs.var.outputs.tag }}
+                    ${{ needs.var.outputs.image }}-vulkan-linux-amd64:${{ needs.var.outputs.tag }}
                   docker manifest push ${{ needs.var.outputs.image }}:${{ matrix.tag }}
             - name: Push
               run: |
