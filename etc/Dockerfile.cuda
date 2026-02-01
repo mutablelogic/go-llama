@@ -24,22 +24,22 @@ ENV PATH=$PATH:/usr/local/go/bin
 WORKDIR /app
 COPY . .
 
-# Make gollama with CUDA support (disable native CPU optimizations for portability)
+# Make go-llama with CUDA support (disable native CPU optimizations for portability)
 ENV GGML_CUDA=1
-RUN make clean && GGML_NATIVE=OFF BUILD_JOBS=${BUILD_JOBS} make gollama
+RUN make clean && GGML_NATIVE=OFF BUILD_JOBS=${BUILD_JOBS} make go-llama
 
 # Setup runtime container
 FROM ${BASE_RUN_CONTAINER} AS runtime
 RUN apt-get -y update \
     && apt-get -y install ca-certificates libgomp1
 
-# Copy built gollama binary
-COPY --from=build --chmod=755 /app/build/gollama /usr/local/bin/gollama
+# Copy built go-llama binary
+COPY --from=build --chmod=755 /app/build/go-llama /usr/local/bin/go-llama
 
 # Container environment
 ENV GOLLAMA_DIR="/data"
 ENV GOLLAMA_ADDR="0.0.0.0:8081"
 VOLUME [ "/data" ]
-ENTRYPOINT [ "/usr/local/bin/gollama" ]
+ENTRYPOINT [ "/usr/local/bin/go-llama" ]
 STOPSIGNAL SIGQUIT
 EXPOSE 8081

@@ -48,10 +48,10 @@ func (cmd *RunServer) Run(ctx *Globals) error {
 	modelsPath := cmd.Models
 	if modelsPath == "" {
 		// Use default from environment or cache dir
-		if dir, err := os.UserCacheDir(); err == nil {
-			modelsPath = filepath.Join(dir, "gollama")
+		if dir, err := os.UserCacheDir(); err != nil {
+			return err
 		} else {
-			modelsPath = filepath.Join(os.TempDir(), "gollama")
+			modelsPath = filepath.Join(dir, ctx.execName)
 		}
 	}
 
@@ -92,11 +92,18 @@ func (cmd *RunServer) Run(ctx *Globals) error {
 
 	// Register HTTP handlers
 	router := http.NewServeMux()
-	prefix, err := url.JoinPath(ctx.HTTP.Prefix, "gollama")
+	prefix, err := url.JoinPath(ctx.HTTP.Prefix, ctx.execName)
 	if err != nil {
 		return err
 	}
 	httphandler.RegisterHandlers(router, prefix, manager, middleware)
+
+	// Add a root handler that returns the version
+	router.HandleFunc(prefix, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(VersionJSON(ctx)))
+	})
 
 	// Create a TLS config
 	var tlsconfig *tls.Config
@@ -124,11 +131,11 @@ func (cmd *RunServer) Run(ctx *Globals) error {
 
 	// Output the version
 	if version.GitTag != "" {
-		ctx.logger.Printf(ctx.ctx, "gollama@%s", version.GitTag)
+		ctx.logger.Printf(ctx.ctx, "%s@%s", ctx.execName, version.GitTag)
 	} else if version.GitHash != "" {
-		ctx.logger.Printf(ctx.ctx, "gollama@%s", version.GitHash[:8])
+		ctx.logger.Printf(ctx.ctx, "%s@%s", ctx.execName, version.GitHash[:8])
 	} else {
-		ctx.logger.Printf(ctx.ctx, "gollama")
+		ctx.logger.Printf(ctx.ctx, "%s@dev", ctx.execName)
 	}
 
 	// Run the HTTP server
@@ -137,7 +144,7 @@ func (cmd *RunServer) Run(ctx *Globals) error {
 		defer wg.Done()
 
 		// Output listening information
-		ctx.logger.With("addr", ctx.HTTP.Addr, "prefix", ctx.HTTP.Prefix).Print(ctx.ctx, "http server starting")
+		ctx.logger.With("addr", ctx.HTTP.Addr, "prefix", prefix).Print(ctx.ctx, "http server starting")
 
 		// Run the server
 		if err := server.Run(ctx.ctx); err != nil {
@@ -153,9 +160,9 @@ func (cmd *RunServer) Run(ctx *Globals) error {
 
 	// Terminated message
 	if result == nil {
-		ctx.logger.With("addr", ctx.HTTP.Addr, "prefix", ctx.HTTP.Prefix).Print(ctx.ctx, "terminated gracefully")
+		ctx.logger.Print(ctx.ctx, "terminated gracefully")
 	} else {
-		ctx.logger.With("addr", ctx.HTTP.Addr, "prefix", ctx.HTTP.Prefix).Print(ctx.ctx, result)
+		ctx.logger.Print(ctx.ctx, result)
 	}
 
 	// Return any error
