@@ -356,26 +356,30 @@ func findPartialStop(s string, stops []string) int {
 		}
 
 		// Check each possible prefix of the stop word, starting from longest.
-		// We only need to consider prefixes up to the length of s, since longer
-		// prefixes cannot be a suffix of s.
-		maxPrefixLen := len(stop)
-		if maxPrefixLen > len(s) {
-			maxPrefixLen = len(s)
+	maxPrefixLen := 0
+
+	for _, stop := range stops {
+		if len(stop) == 0 {
+			continue
 		}
 
+		// Check each possible prefix of the stop word, starting from longest.
 		// We look for prefixes that end with the last character of s.
-		for prefixLen := maxPrefixLen; prefixLen >= 1; prefixLen-- {
+		for prefixLen := len(stop); prefixLen >= 1; prefixLen-- {
 			if stop[prefixLen-1] != lastChar {
 				continue
 			}
 
 			prefix := stop[:prefixLen]
-			if strings.HasSuffix(s, prefix) {
-				return len(s) - prefixLen
+			if strings.HasSuffix(s, prefix) && prefixLen > maxPrefixLen {
+				maxPrefixLen = prefixLen
 			}
 		}
 	}
 
+	if maxPrefixLen > 0 {
+		return len(s) - maxPrefixLen
+	}
 	return -1
 }
 
