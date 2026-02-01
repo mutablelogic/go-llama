@@ -349,15 +349,7 @@ func findPartialStop(s string, stops []string) int {
 	}
 
 	lastChar := s[len(s)-1]
-
-	for _, stop := range stops {
-		if len(stop) == 0 {
-			continue
-		}
-
-		// Check each possible prefix of the stop word, starting from longest.
 	maxPrefixLen := 0
-
 	for _, stop := range stops {
 		if len(stop) == 0 {
 			continue
